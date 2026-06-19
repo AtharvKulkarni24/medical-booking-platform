@@ -3,6 +3,8 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const authRoutes = require("./routes/authRoutes");
+const patientRoutes=require('./routes/patientRoutes');
+const searchRoutes=require('./routes/searchRoutes');
 
 //Import the database connection pool
 const db = require("./config/db");
@@ -21,6 +23,8 @@ app.use(express.json());
 //----Routes---
 
 app.use("/api/auth", authRoutes);
+app.use('/api/patients',patientRoutes);
+app.use('/api/search',searchRoutes);
 
 // ---Health Check Route ---
 // A simple route to test if the server and database are alive
