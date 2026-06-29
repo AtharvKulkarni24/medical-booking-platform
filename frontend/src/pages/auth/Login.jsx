@@ -58,7 +58,7 @@ const Login = () => {
             onClick={() => setUserType('lab')}
             type="button"
           >
-            I am a Diagnostic Center
+            I am a Lab
           </button>
         </div>
 
