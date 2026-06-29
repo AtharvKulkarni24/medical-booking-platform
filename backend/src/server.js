@@ -1,18 +1,18 @@
-//backend/src/server.js
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+
+const app = express();   // ✅ Move this here
+
 const authRoutes = require("./routes/authRoutes");
-const patientRoutes=require('./routes/patientRoutes');
-const searchRoutes=require('./routes/searchRoutes');
+const testRoutes = require("./routes/testRoutes");
+ 
+ const labDashboardRoutes = require("./routes/labDashboardRoutes");
 
-//Import the database connection pool
+app.use("/api/labs", labDashboardRoutes);
+
 const db = require("./config/db");
-
-//Import Redis client
 const { initRedis } = require("./services/redisClient");
-
-const app = express();
 
 // ----Middleware----
 // Allows request from our Vite React Frontend
@@ -21,11 +21,28 @@ app.use(cors());
 app.use(express.json());
 
 //----Routes---
-
 app.use("/api/auth", authRoutes);
-app.use('/api/patients',patientRoutes);
-app.use('/api/search',searchRoutes);
-;
+app.use("/api/auth", testRoutes);
+ 
+
+// ---Health Check Route ---
+// A simple route to test if the server and database are alive
+app.get("/api/health", async (req, res) => {
+  try {
+    //Run a tiny query against the database
+    const result = await db.query("SELECT NOW()");
+    res.status(200).json({
+      success: true,
+      message: "Medical Platform API is running smoothly!",
+      database_time: result.rows[0].now,
+    });
+  } catch (error) {
+    console.log("Database Connection Error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Database connection failed." });
+  }
+});
 
 // --- Server Initialization ---
 const PORT = process.env.PORT || 5000;
