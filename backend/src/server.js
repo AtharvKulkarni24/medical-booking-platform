@@ -1,69 +1,97 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
+const cookieParser = require("cookie-parser");
 
-const app = express();   // ✅ Move this here
+// --- Initialize Express ---
+const app = express();
 
-const authRoutes = require("./routes/authRoutes");
-const testRoutes = require("./routes/testRoutes");
- 
- const labDashboardRoutes = require("./routes/labDashboardRoutes");
-
-app.use("/api/labs", labDashboardRoutes);
-
+// --- Import Database & Services ---
 const db = require("./config/db");
 const { initRedis } = require("./services/redisClient");
 
-// ----Middleware----
-// Allows request from our Vite React Frontend
-app.use(cors());
-//Parse incoming JSON payloads in the request body
+// --- Import Routes ---
+const authRoutes = require("./routes/authRoutes");
+const patientRoutes = require("./routes/patientRoutes");
+const searchRoutes = require("./routes/searchRoutes");
+const labRoutes = require("./routes/labRoutes");
+const testRoutes = require("./routes/testRoutes");
+
+// ==========================================
+// 1. GLOBAL MIDDLEWARE
+// ==========================================
+
+// Allows requests from our Vite React Frontend
+app.use(cors({
+  origin: "http://localhost:5173", 
+  credentials: true
+}));
+
+app.use(cookieParser());
 app.use(express.json());
 
-//----Routes---
-app.use("/api/auth", authRoutes);
-app.use("/api/auth", testRoutes);
- 
+// ==========================================
+// 2. ROUTE MOUNTING
+// ==========================================
 
-// ---Health Check Route ---
-// A simple route to test if the server and database are alive
+// Auth Routes (/api/patients/login, etc.)
+app.use("/api", authRoutes);
+
+// Patient Profile Routes
+app.use("/api/patients", patientRoutes);
+
+// Search Routes
+app.use("/api/search", searchRoutes);
+
+// Lab Profile Routes
+app.use("/api/labs", labRoutes);
+
+// Lab Test Catalog Routes
+app.use("/api/labs/tests", testRoutes);
+
+// ==========================================
+// 3. HEALTH CHECK
+// ==========================================
+
 app.get("/api/health", async (req, res) => {
   try {
-    //Run a tiny query against the database
     const result = await db.query("SELECT NOW()");
     res.status(200).json({
       success: true,
       message: "Medical Platform API is running smoothly!",
-      database_time: result.rows[0].now,
+      database_time: result.rows.now,
     });
   } catch (error) {
-    console.log("Database Connection Error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Database connection failed." });
+    console.error("Database Connection Error:", error);
+    res.status(500).json({ success: false, message: "Database connection failed." });
   }
 });
 
-// --- Server Initialization ---
+// Catch-all for undefined routes
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: "API Route not found." });
+});
+
+// ==========================================
+// 4. SERVER INITIALIZATION
+// ==========================================
+
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
-    // Initialize Redis connection (may return null if unavailable)
     const redisClient = await initRedis();
     if (redisClient) {
-      console.log("Redis connected successfully");
+      console.log("🟢 Redis connected successfully");
     } else {
-      console.warn(
-        "Redis not available; starting with in-memory blacklist fallback.",
-      );
+      console.warn("🟡 Redis not available; starting with in-memory blacklist fallback.");
     }
 
     app.listen(PORT, () => {
-      console.log("Server is running on http://localhost:" + PORT);
+      console.log(`🚀 Server is running securely on http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    console.error("🔴 Failed to start server:", error);
     process.exit(1);
   }
 };

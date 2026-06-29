@@ -4,30 +4,11 @@ const router = express.Router();
 const { authenticateToken } = require("../middlewares/authMiddleware");
 const testController = require("../controllers/testController");
 
-router.post(
-  "/labs/tests",
-  authenticateToken,
-  testController.createTest
-);
-router.get(
-    "/labs/tests",
-    authenticateToken,
-    testController.getAllTests
-);
-router.get(
-  "/labs/tests/:id",
-  authenticateToken,
-  testController.getTestById
-);
-router.put(
-  "/labs/tests/:id",
-  authenticateToken,
-  testController.updateTest
-);
+// The base path '/api/labs/tests' will be defined in server.js
+router.post("/", authenticateToken, testController.createTest);
+router.get("/", authenticateToken, testController.getAllTests);
+router.get("/:id", authenticateToken, testController.getTestById);
+router.put("/:id", authenticateToken, testController.updateTest);
+router.delete("/:id", authenticateToken, testController.deleteTest);
 
-router.delete(
-  "/labs/tests/:id",
-  authenticateToken,
-  testController.deleteTest
-);
 module.exports = router;

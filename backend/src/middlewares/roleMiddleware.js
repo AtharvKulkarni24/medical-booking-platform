@@ -1,9 +1,8 @@
-// Role-based authorization middleware
-// Usage: app.use("/api/labs", authorizeRole("lab"), labRoutes);
+// Usage: app.use("/api/labs", authenticateToken, authorizeRole("lab"), labRoutes);
 
 const authorizeRole = (...allowedRoles) => {
   return (req, res, next) => {
-    // Ensure user is authenticated first (authenticateToken should run before this)
+    
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -11,15 +10,13 @@ const authorizeRole = (...allowedRoles) => {
       });
     }
 
-    // Check if user's role is in the allowed roles
-    if (!allowedRoles.includes(req.user.role)) {
+    if (!allowedRoles.includes(req.user.userType)) {
       return res.status(403).json({
         success: false,
-        error: `Access denied. This resource requires one of the following roles: ${allowedRoles.join(", ")}. Your role: ${req.user.role}`,
+        error: `Access denied. This action requires one of the following accounts: ${allowedRoles.join(", ")}.`,
       });
     }
 
-    // User has required role, proceed
     next();
   };
 };

@@ -19,10 +19,7 @@ const initRedis = async () => {
     await client.connect();
     return client;
   } catch (error) {
-    console.warn(
-      "Redis unavailable, falling back to in-memory blacklist:",
-      error?.message || error,
-    );
+    console.warn("Redis unavailable, falling back to in-memory blacklist:", error?.message || error);
     client = null;
     return null;
   }
@@ -32,20 +29,18 @@ const redisAvailable = () => client && client.isOpen;
 
 const cleanupFallback = () => {
   const now = Date.now();
-  for (const [token, expiresAt] of fallbackBlacklist.entries()) {
+  for (const [token, data] of fallbackBlacklist.entries()) {
+    // Determine if it's a simple timestamp (blacklist) or an object (refresh token)
+    const expiresAt = typeof data === 'object' ? data.expiresAt : data;
     if (expiresAt <= now) {
       fallbackBlacklist.delete(token);
     }
   }
 };
 
-// Blacklist a token (add it to Redis or in-memory fallback)
 const blacklistToken = async (token, expiresIn) => {
   try {
-    if (expiresIn <= 0) {
-      // Token already expired or no TTL — nothing to store
-      return;
-    }
+    if (expiresIn <= 0) return;
 
     if (redisAvailable()) {
       await client.setEx(`blacklist:${token}`, expiresIn, "true");
@@ -60,7 +55,6 @@ const blacklistToken = async (token, expiresIn) => {
   }
 };
 
-// Check if token is blacklisted
 const isTokenBlacklisted = async (token) => {
   try {
     if (redisAvailable()) {
@@ -72,29 +66,26 @@ const isTokenBlacklisted = async (token) => {
     return fallbackBlacklist.has(token);
   } catch (error) {
     console.error("Error checking token blacklist:", error);
-    return false; // On error, allow the request (fail open)
+    return false; 
   }
 };
 
-// Store refresh token for a user
 const storeRefreshToken = async (userId, refreshToken) => {
   try {
     if (redisAvailable()) {
-      // Store with 7 day TTL
       await client.setEx(`refresh:${userId}`, 7 * 24 * 60 * 60, refreshToken);
       return;
     }
 
-    // Fallback: store in-memory with expiry
+    // FIX: Store as an object
     const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
-    fallbackBlacklist.set(`refresh:${userId}`, expiresAt);
+    fallbackBlacklist.set(`refresh:${userId}`, { token: refreshToken, expiresAt });
   } catch (error) {
     console.error("Error storing refresh token:", error);
     throw error;
   }
 };
 
-// Retrieve refresh token for a user
 const getRefreshToken = async (userId) => {
   try {
     if (redisAvailable()) {
@@ -102,10 +93,11 @@ const getRefreshToken = async (userId) => {
     }
 
     cleanupFallback();
-    const expiresAt = fallbackBlacklist.get(`refresh:${userId}`);
-    if (expiresAt && expiresAt > Date.now()) {
-      // In a real scenario, we'd store the token in the map value
-      return fallbackBlacklist.get(`refresh:${userId}`);
+    const data = fallbackBlacklist.get(`refresh:${userId}`);
+    
+    // FIX: Retrieve token from object
+    if (data && data.expiresAt > Date.now()) {
+      return data.token;
     }
     return null;
   } catch (error) {
@@ -114,7 +106,6 @@ const getRefreshToken = async (userId) => {
   }
 };
 
-// Revoke all refresh tokens for a user (logout)
 const revokeRefreshToken = async (userId) => {
   try {
     if (redisAvailable()) {
