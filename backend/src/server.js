@@ -1,16 +1,18 @@
-//backend/src/server.js
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+
+const app = express();   // ✅ Move this here
+
 const authRoutes = require("./routes/authRoutes");
+const testRoutes = require("./routes/testRoutes");
+ 
+ const labDashboardRoutes = require("./routes/labDashboardRoutes");
 
-//Import the database connection pool
+app.use("/api/labs", labDashboardRoutes);
+
 const db = require("./config/db");
-
-//Import Redis client
 const { initRedis } = require("./services/redisClient");
-
-const app = express();
 
 // ----Middleware----
 // Allows request from our Vite React Frontend
@@ -19,8 +21,9 @@ app.use(cors());
 app.use(express.json());
 
 //----Routes---
-
 app.use("/api/auth", authRoutes);
+app.use("/api/auth", testRoutes);
+ 
 
 // ---Health Check Route ---
 // A simple route to test if the server and database are alive
