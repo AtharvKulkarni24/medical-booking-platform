@@ -17,4 +17,7 @@ router.post("/labs/register", authController.registerLab);
 router.post("/labs/login", authController.loginLab);
 router.post("/labs/logout", authenticateToken, authController.logoutLab);
 
+// Refresh token endpoint (available to all authenticated users)
+router.post("/refresh", authController.refreshAccessToken);
+
 module.exports = router;

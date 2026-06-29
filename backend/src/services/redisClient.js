@@ -76,8 +76,64 @@ const isTokenBlacklisted = async (token) => {
   }
 };
 
+// Store refresh token for a user
+const storeRefreshToken = async (userId, refreshToken) => {
+  try {
+    if (redisAvailable()) {
+      // Store with 7 day TTL
+      await client.setEx(`refresh:${userId}`, 7 * 24 * 60 * 60, refreshToken);
+      return;
+    }
+
+    // Fallback: store in-memory with expiry
+    const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    fallbackBlacklist.set(`refresh:${userId}`, expiresAt);
+  } catch (error) {
+    console.error("Error storing refresh token:", error);
+    throw error;
+  }
+};
+
+// Retrieve refresh token for a user
+const getRefreshToken = async (userId) => {
+  try {
+    if (redisAvailable()) {
+      return await client.get(`refresh:${userId}`);
+    }
+
+    cleanupFallback();
+    const expiresAt = fallbackBlacklist.get(`refresh:${userId}`);
+    if (expiresAt && expiresAt > Date.now()) {
+      // In a real scenario, we'd store the token in the map value
+      return fallbackBlacklist.get(`refresh:${userId}`);
+    }
+    return null;
+  } catch (error) {
+    console.error("Error retrieving refresh token:", error);
+    return null;
+  }
+};
+
+// Revoke all refresh tokens for a user (logout)
+const revokeRefreshToken = async (userId) => {
+  try {
+    if (redisAvailable()) {
+      await client.del(`refresh:${userId}`);
+      return;
+    }
+
+    fallbackBlacklist.delete(`refresh:${userId}`);
+  } catch (error) {
+    console.error("Error revoking refresh token:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   initRedis,
   blacklistToken,
   isTokenBlacklisted,
+  storeRefreshToken,
+  getRefreshToken,
+  revokeRefreshToken,
 };

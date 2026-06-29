@@ -1,13 +1,29 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const db = require("../config/db");
-const { blacklistToken } = require("../services/redisClient");
+const {
+  blacklistToken,
+  storeRefreshToken,
+  getRefreshToken,
+  revokeRefreshToken,
+} = require("../services/redisClient");
 
-// Helper function to generate JWT tokens
-const generateToken = (id, role) => {
+// Generate short-lived access token
+const generateAccessToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || "1d",
+    expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || "15m",
   });
+};
+
+// Generate long-lived refresh token
+const generateRefreshToken = (id, role) => {
+  return jwt.sign(
+    { id, role },
+    process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET,
+    {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d",
+    },
+  );
 };
 
 // --- PATIENT REGISTRATION ---
@@ -50,14 +66,19 @@ exports.registerPatient = async (req, res) => {
     ]);
     const patient = newUser.rows[0];
 
-    //Generate an authentication token
-    const token = generateToken(patient.patient_id, "patient");
+    //Generate access and refresh tokens
+    const accessToken = generateAccessToken(patient.patient_id, "patient");
+    const refreshToken = generateRefreshToken(patient.patient_id, "patient");
+
+    // Store refresh token
+    await storeRefreshToken(patient.patient_id, refreshToken);
 
     //Send the success response
     res.status(201).json({
       success: true,
       message: "Patient registers successfully",
-      token,
+      accessToken,
+      refreshToken,
       patient: {
         id: patient.patient_id,
         name: patient.name,
@@ -82,7 +103,7 @@ exports.loginPatient = async (req, res) => {
     if (!email || !password) {
       return res
         .status(400)
-        .json({ success: false, error: "Please orovide email and password." });
+        .json({ success: false, error: "Please provide email and password." });
     }
 
     // find patient in the database
@@ -108,14 +129,18 @@ exports.loginPatient = async (req, res) => {
         .json({ success: false, error: "Invalid email or password." });
     }
 
-    // Generatea a new authentication token
+    // Generate access and refresh tokens
+    const accessToken = generateAccessToken(patient.patient_id, "patient");
+    const refreshToken = generateRefreshToken(patient.patient_id, "patient");
 
-    const token = generateToken(patient.patient_id, "patient");
+    // Store refresh token
+    await storeRefreshToken(patient.patient_id, refreshToken);
 
     res.status(200).json({
       success: true,
       message: "Login successful",
-      token,
+      accessToken,
+      refreshToken,
       patient: {
         id: patient.patient_id,
         name: patient.name,
@@ -136,22 +161,38 @@ exports.logoutPatient = async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
+    const patientId = req.user.id;
 
     if (token) {
+      // Verify token validity before blacklisting
+      try {
+        jwt.verify(token, process.env.JWT_SECRET);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid or expired token.",
+        });
+      }
+
       // Calculate remaining expiry time
       const decoded = jwt.decode(token);
-      const expiresIn = Math.max(
-        decoded.exp - Math.floor(Date.now() / 1000),
-        0,
-      );
+      if (decoded && decoded.exp) {
+        const expiresIn = Math.max(
+          decoded.exp - Math.floor(Date.now() / 1000),
+          0,
+        );
 
-      // Blacklist the token
-      await blacklistToken(token, expiresIn);
+        // Blacklist the access token
+        await blacklistToken(token, expiresIn);
+      }
     }
+
+    // Revoke all refresh tokens for this patient
+    await revokeRefreshToken(patientId);
 
     res.status(200).json({
       success: true,
-      message: "Logout successful. Token has been invalidated.",
+      message: "Logout successful. All tokens have been invalidated.",
     });
   } catch (error) {
     console.error("Patient Logout Error:", error);
@@ -226,7 +267,8 @@ exports.registerLab = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Lab registered successfully.Pending manual verification.",
+      message:
+        "Lab registered successfully. Please wait for admin verification before attempting to login. You will receive a confirmation email once your auth_document_url has been verified.",
       lab: {
         id: lab.lab_id,
         name: lab.name,
@@ -269,13 +311,11 @@ exports.loginLab = async (req, res) => {
     //If the lab is not verified ,block the logn immediately
 
     if (lab.is_verified == false) {
-      return res
-        .status(403)
-        .json({
-          success: true,
-          error:
-            "Your acount is pending manual verification.You cannot login until your documents are approved.",
-        });
+      return res.status(403).json({
+        success: false,
+        error:
+          "Your acount is pending manual verification.You cannot login until your documents are approved.",
+      });
     }
 
     // Verify the password (only happens if they are verfied)
@@ -288,13 +328,18 @@ exports.loginLab = async (req, res) => {
         .json({ success: false, error: "Invalid email or password." });
     }
 
-    // Generate an authentication token
-    const token = generateToken(lab.lab_id, "lab");
+    // Generate access and refresh tokens
+    const accessToken = generateAccessToken(lab.lab_id, "lab");
+    const refreshToken = generateRefreshToken(lab.lab_id, "lab");
+
+    // Store refresh token
+    await storeRefreshToken(lab.lab_id, refreshToken);
 
     res.status(200).json({
       success: true,
       message: "Lab Login successful",
-      token,
+      accessToken,
+      refreshToken,
       lab: {
         id: lab.lab_id,
         name: lab.name,
@@ -314,27 +359,93 @@ exports.logoutLab = async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
+    const labId = req.user.id;
 
     if (token) {
+      // Verify token validity before blacklisting
+      try {
+        jwt.verify(token, process.env.JWT_SECRET);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid or expired token.",
+        });
+      }
+
       // Calculate remaining expiry time
       const decoded = jwt.decode(token);
-      const expiresIn = Math.max(
-        decoded.exp - Math.floor(Date.now() / 1000),
-        0,
-      );
+      if (decoded && decoded.exp) {
+        const expiresIn = Math.max(
+          decoded.exp - Math.floor(Date.now() / 1000),
+          0,
+        );
 
-      // Blacklist the token
-      await blacklistToken(token, expiresIn);
+        // Blacklist the access token
+        await blacklistToken(token, expiresIn);
+      }
     }
+
+    // Revoke all refresh tokens for this lab
+    await revokeRefreshToken(labId);
 
     res.status(200).json({
       success: true,
-      message: "Logout successful. Token has been invalidated.",
+      message: "Logout successful. All tokens have been invalidated.",
     });
   } catch (error) {
     console.error("Lab Logout Error:", error);
     res
       .status(500)
       .json({ success: false, error: "Server error during logout." });
+  }
+};
+
+// --- REFRESH TOKEN ENDPOINT ---
+exports.refreshAccessToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        error: "Refresh token is required.",
+      });
+    }
+
+    // Verify refresh token
+    let decoded;
+    try {
+      decoded = jwt.verify(
+        refreshToken,
+        process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET,
+      );
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid or expired refresh token.",
+      });
+    }
+
+    // Check if refresh token is stored (not revoked)
+    const storedToken = await getRefreshToken(decoded.id);
+    if (!storedToken || storedToken !== refreshToken) {
+      return res.status(401).json({
+        success: false,
+        error: "Refresh token has been revoked. Please login again.",
+      });
+    }
+
+    // Generate new access token
+    const newAccessToken = generateAccessToken(decoded.id, decoded.role);
+
+    res.status(200).json({
+      success: true,
+      accessToken: newAccessToken,
+    });
+  } catch (error) {
+    console.error("Token Refresh Error:", error);
+    res
+      .status(500)
+      .json({ success: false, error: "Server error during token refresh." });
   }
 };
