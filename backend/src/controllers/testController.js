@@ -3,7 +3,6 @@ const db = require("../config/db");
 // --- CREATE A NEW TEST ---
 exports.createTest = async (req, res) => {
   try {
-    // Extracted from your JWT auth middleware
     const labId = req.user.id; 
     const { test_name, description, price } = req.body;
 
@@ -14,10 +13,9 @@ exports.createTest = async (req, res) => {
       });
     }
 
-    // Check if this lab already offers this exact test
     const existingTest = await db.query(
       `SELECT test_id FROM tests 
-       WHERE lab_id = $1 AND test_name = $2`, // Removed LOWER() since frontend uses a strict dropdown
+       WHERE lab_id = $1 AND test_name = $2`, 
       [labId, test_name]
     );
 
@@ -28,17 +26,17 @@ exports.createTest = async (req, res) => {
       });
     }
 
-    // Insert the test (defaulting is_verified to TRUE so it appears in searches)
+    // UPDATED: is_verified is now explicitly FALSE upon creation
     const result = await db.query(
       `INSERT INTO tests (lab_id, test_name, description, price, is_verified) 
-       VALUES ($1, $2, $3, $4, TRUE) 
+       VALUES ($1, $2, $3, $4, FALSE) 
        RETURNING test_id, test_name, description, price, is_verified`,
       [labId, test_name, description, price]
     );
 
     res.status(201).json({
       success: true,
-      message: "Test added to catalog successfully.",
+      message: "Test added to catalog successfully. Pending verification.",
       test: result.rows
     });
 
@@ -57,7 +55,7 @@ exports.getAllTests = async (req, res) => {
       `SELECT test_id, test_name, description, price, is_verified 
        FROM tests 
        WHERE lab_id = $1 
-       ORDER BY test_name ASC`, // Alphabetical order is best for medical catalogs
+       ORDER BY test_name ASC`, 
       [labId]
     );
 
@@ -108,13 +106,17 @@ exports.updateTest = async (req, res) => {
     const { id } = req.params;
     const { test_name, description, price } = req.body;
 
-    // Optimized: Combined authorization check and update into a single secure query
+    // UPDATED: Using COALESCE for partial updates and forcing is_verified = FALSE
     const result = await db.query(
       `UPDATE tests 
-       SET test_name = $1, description = $2, price = $3 
+       SET 
+         test_name = COALESCE($1, test_name), 
+         description = COALESCE($2, description), 
+         price = COALESCE($3, price),
+         is_verified = FALSE
        WHERE test_id = $4 AND lab_id = $5 
        RETURNING test_id, test_name, description, price, is_verified;`,
-      [test_name, description, price, id, labId] // $5 ensures a lab can't edit another lab's test
+      [test_name, description, price, id, labId] 
     );
 
     if (result.rows.length === 0) {
@@ -126,7 +128,7 @@ exports.updateTest = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Test updated successfully.",
+      message: "Test updated successfully. It has been marked for re-verification.",
       test: result.rows
     });
 
@@ -142,7 +144,6 @@ exports.deleteTest = async (req, res) => {
     const labId = req.user.id;
     const { id } = req.params;
 
-    // Optimized: Combined authorization check and delete into a single query
     const result = await db.query(
       `DELETE FROM tests 
        WHERE test_id = $1 AND lab_id = $2 

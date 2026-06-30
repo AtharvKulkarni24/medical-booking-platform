@@ -11,7 +11,7 @@ const generateAccessToken = (id, userType) => {
     return jwt.sign(
         { id, userType },
         process.env.JWT_SECRET || 'super_secret_access_key',
-        { expiresIn: '15m' }
+        { expiresIn: '30m' }
     );
 };
 
@@ -26,8 +26,8 @@ const generateRefreshToken = (id, userType) => {
 const sendRefreshTokenCookie = (res, token) => {
     res.cookie('refreshToken', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        // secure: false,
+        // sameSite: process.env.NODE_ENV==='production'?'strict':'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000
     });
 };
@@ -105,6 +105,7 @@ exports.loginPatient = async (req, res) => {
 
         res.status(200).json({
             success: true,
+            refreshToken,
             accessToken,
             user: { id: patient.patient_id, name: patient.name, email: patient.email }
         });
@@ -189,6 +190,7 @@ exports.loginLab = async (req, res) => {
 
         res.status(200).json({
             success: true,
+            refreshToken,
             accessToken,
             user: { id: lab.lab_id, name: lab.name, email: lab.email, is_verified: lab.is_verified }
         });
