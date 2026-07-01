@@ -15,4 +15,10 @@ router.get("/profile", authenticateToken, labController.getLabProfile);
 router.put("/profile", authenticateToken, labController.updateLabProfile);
 router.patch("/profile/password", labController.updateLabPassword);
 
+//Time slots
+router.post("/slots", authenticateToken, labController.createSlot);
+router.get("/slots", authenticateToken, labController.getLabSlots);
+router.put("/slots/:slot_id", authenticateToken, labController.updateSlot);
+router.delete("/slots/:slot_id", authenticateToken, labController.deleteSlot);
+
 module.exports = router;
