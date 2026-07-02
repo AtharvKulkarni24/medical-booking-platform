@@ -1,108 +1,90 @@
--- ==========================================
--- MEDICAL PLATFORM DATABASE SCHEMA
--- ==========================================
+-- 1. ENABLE EXTENSIONS
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- 1. Enable Required Extensions
--- pgcrypto allows us to auto-generate UUIDs
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
--- postgis enables the geospatial logic for distance searching
-CREATE EXTENSION IF NOT EXISTS "postgis";
+-- 2. DROP EXISTING TABLES (Reverse Order of Creation)
+DROP TABLE IF EXISTS reviews CASCADE;
+DROP TABLE IF EXISTS payments CASCADE;
+DROP TABLE IF EXISTS appointments CASCADE;
+DROP TABLE IF EXISTS time_slots CASCADE;
+DROP TABLE IF EXISTS tests CASCADE;
+DROP TABLE IF EXISTS labs CASCADE;
+DROP TABLE IF EXISTS patients CASCADE;
 
--- (Optional) Developer Helper: Drop existing tables if you ever need a clean reset
--- Remove the '--' to uncomment these during early testing if you need to wipe the DB
--- DROP TABLE IF EXISTS reviews CASCADE;
--- DROP TABLE IF EXISTS payments CASCADE;
--- DROP TABLE IF EXISTS appointments CASCADE;
--- DROP TABLE IF EXISTS time_slots CASCADE;
--- DROP TABLE IF EXISTS tests CASCADE;
--- DROP TABLE IF EXISTS labs CASCADE;
--- DROP TABLE IF EXISTS patients CASCADE;
-
-
--- ==========================================
--- LEVEL 1: PARENT TABLES (Independent)
--- ==========================================
-
+-- 3. CREATE TABLES
 CREATE TABLE patients (
-    patient_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
+    phone_number VARCHAR(20) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    phone_number VARCHAR(20) NOT NULL,
-    last_known_location GEOGRAPHY(Point, 4326) -- SRID 4326 is standard GPS coordinates
-);
-
-CREATE TABLE labs (
-    lab_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    address_text TEXT NOT NULL,
-    location_coordinates GEOGRAPHY(Point, 4326) NOT NULL,
-    auth_document_url VARCHAR(500),
-    is_verified BOOLEAN DEFAULT FALSE,
-    average_rating DECIMAL(3, 2) DEFAULT 0.00
-);
-
-
--- ==========================================
--- LEVEL 2: LAB OFFERINGS (Depends on Labs)
--- ==========================================
-
-CREATE TABLE tests (
-    test_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    lab_id UUID REFERENCES labs(lab_id) ON DELETE CASCADE,
-    test_name VARCHAR(255) NOT NULL,
-    price DECIMAL(10, 2) NOT NULL,
-    description TEXT,
-    is_verified BOOLEAN DEFAULT FALSE
-);
-
-CREATE TABLE time_slots (
-    slot_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    lab_id UUID REFERENCES labs(lab_id) ON DELETE CASCADE,
-    start_time TIMESTAMP NOT NULL,
-    end_time TIMESTAMP NOT NULL,
-    max_capacity INTEGER NOT NULL CHECK (max_capacity > 0),
-    current_bookings INTEGER DEFAULT 0
-);
-
-
--- ==========================================
--- LEVEL 3: CORE TRANSACTIONS (Depends on Patients, Labs, Tests, Slots)
--- ==========================================
-
-CREATE TABLE appointments (
-    appointment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id UUID REFERENCES patients(patient_id),
-    lab_id UUID REFERENCES labs(lab_id),
-    test_id UUID REFERENCES tests(test_id),
-    slot_id UUID REFERENCES time_slots(slot_id),
-    status VARCHAR(50) NOT NULL DEFAULT 'Pending', -- Valid states: Pending, Confirmed, Completed, Cancelled
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE labs (
+    lab_id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    phone_number VARCHAR(20) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    address_text TEXT NOT NULL,
+    location_coordinates GEOMETRY(Point, 4326) NOT NULL,
+    is_verified BOOLEAN DEFAULT FALSE,
+    auth_document_url TEXT,
+    average_rating DECIMAL(2, 1) DEFAULT 0.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- ==========================================
--- LEVEL 4: DEPENDENT RECORDS (Depends on Appointments)
--- ==========================================
+CREATE TABLE tests (
+    test_id SERIAL PRIMARY KEY,
+    lab_id INT NOT NULL REFERENCES labs(lab_id) ON DELETE CASCADE,
+    test_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL,
+    is_verified BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE time_slots (
+    slot_id SERIAL PRIMARY KEY,
+    lab_id INT NOT NULL REFERENCES labs(lab_id) ON DELETE CASCADE,
+    day_of_week INT NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6),
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    max_capacity INT NOT NULL CHECK (max_capacity > 0),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE appointments (
+    appointment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id INT NOT NULL REFERENCES patients(patient_id),
+    lab_id INT NOT NULL REFERENCES labs(lab_id),
+    test_id INT NOT NULL REFERENCES tests(test_id),
+    slot_id INT NOT NULL REFERENCES time_slots(slot_id),
+    appointment_date DATE NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING', 
+    report_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE payments (
     payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    appointment_id UUID UNIQUE REFERENCES appointments(appointment_id),
+    appointment_id UUID UNIQUE NOT NULL REFERENCES appointments(appointment_id),
     amount DECIMAL(10, 2) NOT NULL,
-    gateway_provider VARCHAR(100) NOT NULL, -- e.g., 'Stripe', 'Razorpay'
+    gateway_provider VARCHAR(100) NOT NULL,
     gateway_order_id VARCHAR(255) NOT NULL,
     gateway_payment_id VARCHAR(255),
-    status VARCHAR(50) NOT NULL DEFAULT 'Pending', -- Valid states: Pending, Success, Failed, Refunded
-    transaction_date TIMESTAMP
+    status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+    transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE reviews (
-    review_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    appointment_id UUID UNIQUE REFERENCES appointments(appointment_id),
-    patient_id UUID REFERENCES patients(patient_id),
-    lab_id UUID REFERENCES labs(lab_id),
-    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
-    comment TEXT
+    review_id SERIAL PRIMARY KEY,
+    patient_id INT NOT NULL REFERENCES patients(patient_id),
+    lab_id INT NOT NULL REFERENCES labs(lab_id),
+    appointment_id UUID UNIQUE NOT NULL REFERENCES appointments(appointment_id),
+    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

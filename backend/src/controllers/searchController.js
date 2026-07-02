@@ -1,15 +1,14 @@
 const db = require('../config/db');
-
 // --- SEARCH LABS WITH SINGLE QUERY, DISTANCE SORTING & PAGINATION ---
 exports.searchLabs = async (req, res) => {
     try {
         const { test, lat, lng, page = 1, limit = 10 } = req.query;
 
         // Validate required fields
-        if (!test || !lat || !lng) {
+        if (!test || lat === undefined || lng === undefined) {
             return res.status(400).json({
                 success: false,
-                error: 'Please provide test name, latitude, and longitude.'
+                error: "Please provide test name, latitude, and longitude."
             });
         }
 
@@ -20,21 +19,20 @@ exports.searchLabs = async (req, res) => {
         if (isNaN(userLat) || isNaN(userLng)) {
             return res.status(400).json({
                 success: false,
-                error: 'Invalid latitude or longitude.'
+                error: "Invalid latitude or longitude."
             });
         }
 
-        // Validate pagination parameters
+        // Validate pagination
         let pageNum = parseInt(page, 10) || 1;
         let limitNum = parseInt(limit, 10) || 10;
 
         if (pageNum < 1) pageNum = 1;
-        if (limitNum < 1 || limitNum > 100) limitNum = 10; // Max 100 per page
+        if (limitNum < 1 || limitNum > 100) limitNum = 10;
 
         const offset = (pageNum - 1) * limitNum;
 
-        // Single query: Get ALL labs within 50km, sorted by distance, with pagination
-        const query = `
+        const searchQuery = `
             SELECT
                 l.lab_id,
                 l.name AS lab_name,
@@ -45,7 +43,6 @@ exports.searchLabs = async (req, res) => {
                 t.test_id,
                 t.test_name,
                 t.price,
-
                 ROUND(
                     (
                         ST_Distance(
@@ -55,50 +52,57 @@ exports.searchLabs = async (req, res) => {
                     )::numeric,
                     1
                 ) AS distance_km
-
             FROM labs l
-            JOIN tests t
+            INNER JOIN tests t
                 ON l.lab_id = t.lab_id
-
-            WHERE l.is_verified = TRUE
-              AND t.is_verified = TRUE
-              AND LOWER(t.test_name) = LOWER($3)
-
-              AND ST_DWithin(
+            WHERE
+                l.is_verified = TRUE
+                AND t.is_verified = TRUE
+                AND LOWER(t.test_name) = LOWER($3)
+                AND ST_DWithin(
                     l.location_coordinates,
                     ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
                     50000
-              )
-
+                )
             ORDER BY distance_km ASC
             LIMIT $4 OFFSET $5;
         `;
 
-        // Get total count for pagination metadata
         const countQuery = `
-            SELECT COUNT(*) as total
+            SELECT COUNT(*) AS total
             FROM labs l
-            JOIN tests t
+            INNER JOIN tests t
                 ON l.lab_id = t.lab_id
-            WHERE l.is_verified = TRUE
-              AND t.is_verified = TRUE
-              AND LOWER(t.test_name) = LOWER($1)
-              AND ST_DWithin(
+            WHERE
+                l.is_verified = TRUE
+                AND t.is_verified = TRUE
+                AND LOWER(t.test_name) = LOWER($1)
+                AND ST_DWithin(
                     l.location_coordinates,
                     ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
                     50000
-              );
+                );
         `;
 
         const [result, countResult] = await Promise.all([
-            db.query(query, [userLng, userLat, test, limitNum, offset]),
-            db.query(countQuery, [test, userLng, userLat])
+            db.query(searchQuery, [
+                userLng,
+                userLat,
+                test,
+                limitNum,
+                offset
+            ]),
+            db.query(countQuery, [
+                test,
+                userLng,
+                userLat
+            ])
         ]);
 
         const totalResults = parseInt(countResult.rows[0].total, 10);
         const totalPages = Math.ceil(totalResults / limitNum);
 
-        if (result.rows.length === 0 && totalResults === 0) {
+        if (totalResults === 0) {
             return res.status(200).json({
                 success: true,
                 results_count: 0,
@@ -106,6 +110,8 @@ exports.searchLabs = async (req, res) => {
                 page: pageNum,
                 limit: limitNum,
                 total_pages: 0,
+                has_next_page: false,
+                has_prev_page: false,
                 message: `No verified labs found offering "${test}" within a 50 km radius.`,
                 labs: []
             });
@@ -125,11 +131,11 @@ exports.searchLabs = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Search Engine Error:', error);
+        console.error("Search Engine Error:", error);
 
         return res.status(500).json({
             success: false,
-            error: 'Server error while searching for labs.'
+            error: "Server error while searching for labs."
         });
     }
 };
@@ -139,6 +145,7 @@ exports.searchLabs = async (req, res) => {
 exports.getLabTestDetails = async (req, res) => {
     try {
         const { lab_id, test_id } = req.params;
+        const { date } = req.query; // NEW: Optional date parameter for dynamic availability
 
         // Validate params
         if (!lab_id || !test_id) {
@@ -170,23 +177,49 @@ exports.getLabTestDetails = async (req, res) => {
               AND t.is_verified = TRUE;
         `;
 
-        const slotsQuery = `
-            SELECT
-                slot_id,
-                start_time,
-                end_time,
-                max_capacity,
-                current_bookings
-            FROM time_slots
-            WHERE lab_id = $1
-              AND start_time > NOW()
-              AND current_bookings < max_capacity
-            ORDER BY start_time ASC;
-        `;
+        let slotsQuery = "";
+        let queryParams = [lab_id];
+
+        // NEW LOGIC: Dynamic Slot Calculation based on our new Architecture
+        if (date) {
+            // If the frontend asks for a specific date, calculate real-time availability
+            const targetDate = new Date(date);
+            const dayOfWeek = targetDate.getDay(); // Returns 0-6 (Sunday-Saturday)
+
+            slotsQuery = `
+                SELECT
+                    t.slot_id,
+                    t.day_of_week,
+                    t.start_time,
+                    t.end_time,
+                    t.max_capacity,
+                    (SELECT COUNT(*) FROM appointments a 
+                     WHERE a.slot_id = t.slot_id 
+                       AND a.appointment_date = $2 
+                       AND a.status = 'CONFIRMED') AS current_bookings
+                FROM time_slots t
+                WHERE t.lab_id = $1 AND t.day_of_week = $3
+                ORDER BY t.start_time ASC;
+            `;
+            queryParams.push(date, dayOfWeek);
+        } else {
+            // If no date is provided, just return the Master Weekly Templates
+            slotsQuery = `
+                SELECT
+                    slot_id,
+                    day_of_week,
+                    start_time,
+                    end_time,
+                    max_capacity
+                FROM time_slots
+                WHERE lab_id = $1
+                ORDER BY day_of_week ASC, start_time ASC;
+            `;
+        }
 
         const [detailsResult, slotsResult] = await Promise.all([
             db.query(detailsQuery, [lab_id, test_id]),
-            db.query(slotsQuery, [lab_id])
+            db.query(slotsQuery, queryParams)
         ]);
 
         if (detailsResult.rows.length === 0) {
@@ -196,11 +229,22 @@ exports.getLabTestDetails = async (req, res) => {
             });
         }
 
+        // Optional: Filter out fully booked slots if a specific date was searched
+        let availableSlots = slotsResult.rows;
+        if (date) {
+            availableSlots = slotsResult.rows.filter(
+                slot => parseInt(slot.current_bookings) < parseInt(slot.max_capacity)
+            );
+            
+            // Note: For same-day searches, you can also filter out times that have already passed 
+            // using JavaScript Date comparisons here, similar to what we did in the booking controller!
+        }
+
         return res.status(200).json({
             success: true,
             data: {
                 lab_and_test_info: detailsResult.rows[0],
-                available_time_slots: slotsResult.rows
+                time_slots: availableSlots
             }
         });
 

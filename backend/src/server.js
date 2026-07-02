@@ -1,13 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const cookieParser = require("cookie-parser");
- 
-
-// --- Initialize Express ---
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const cookieParser = require("cookie-parser"); 
 
 // --- Import Database & Services ---
 const db = require("./config/db");
@@ -19,6 +13,10 @@ const patientRoutes = require("./routes/patientRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 const labRoutes = require("./routes/labRoutes");
 const testRoutes = require("./routes/testRoutes");
+const appointmentRoutes=require("./routes/appointmentRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
+
+const app = express();
 
 // ==========================================
 // 1. GLOBAL MIDDLEWARE
@@ -29,9 +27,9 @@ app.use(cors({
   origin: "http://localhost:5173", 
   credentials: true
 }));
-
-app.use(cookieParser());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // ==========================================
 // 2. ROUTE MOUNTING
@@ -52,23 +50,11 @@ app.use("/api/labs", labRoutes);
 // Lab Test Catalog Routes
 app.use("/api/labs/tests", testRoutes);
 
-// ==========================================
-// 3. HEALTH CHECK
-// ==========================================
+//Appointment Routes
+app.use("/api/appointments", appointmentRoutes);
 
-app.get("/api/health", async (req, res) => {
-  try {
-    const result = await db.query("SELECT NOW()");
-    res.status(200).json({
-      success: true,
-      message: "Medical Platform API is running smoothly!",
-      database_time: result.rows.now,
-    });
-  } catch (error) {
-    console.error("Database Connection Error:", error);
-    res.status(500).json({ success: false, message: "Database connection failed." });
-  }
-});
+//Review Routes
+app.use("/api/reviews", reviewRoutes);
 
 // Catch-all for undefined routes
 app.use((req, res) => {

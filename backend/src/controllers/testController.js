@@ -3,26 +3,26 @@ const db = require("../config/db");
 // --- CREATE A NEW TEST ---
 exports.createTest = async (req, res) => {
   try {
-    const labId = req.user.id; 
+    const labId = req.user.id;
     const { test_name, description, price } = req.body;
 
     if (!test_name || !price) {
       return res.status(400).json({
         success: false,
-        message: "Test name and price are required."
+        message: "Test name and price are required.",
       });
     }
 
     const existingTest = await db.query(
       `SELECT test_id FROM tests 
-       WHERE lab_id = $1 AND test_name = $2`, 
-      [labId, test_name]
+       WHERE lab_id = $1 AND test_name = $2`,
+      [labId, test_name],
     );
 
     if (existingTest.rows.length > 0) {
       return res.status(409).json({
         success: false,
-        message: `${test_name} already exists in your catalog.`
+        message: `${test_name} already exists in your catalog.`,
       });
     }
 
@@ -31,18 +31,22 @@ exports.createTest = async (req, res) => {
       `INSERT INTO tests (lab_id, test_name, description, price, is_verified) 
        VALUES ($1, $2, $3, $4, FALSE) 
        RETURNING test_id, test_name, description, price, is_verified`,
-      [labId, test_name, description, price]
+      [labId, test_name, description, price],
     );
 
     res.status(201).json({
       success: true,
       message: "Test added to catalog successfully. Pending verification.",
-      test: result.rows
+      test: result.rows,
     });
-
   } catch (error) {
     console.error("Create Test Error:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error while creating test." });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Internal Server Error while creating test.",
+      });
   }
 };
 
@@ -55,19 +59,23 @@ exports.getAllTests = async (req, res) => {
       `SELECT test_id, test_name, description, price, is_verified 
        FROM tests 
        WHERE lab_id = $1 
-       ORDER BY test_name ASC`, 
-      [labId]
+       ORDER BY test_name ASC`,
+      [labId],
     );
 
     res.status(200).json({
       success: true,
       count: result.rows.length,
-      tests: result.rows
+      tests: result.rows,
     });
-
   } catch (error) {
     console.error("Get All Tests Error:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error while fetching tests." });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Internal Server Error while fetching tests.",
+      });
   }
 };
 
@@ -81,18 +89,19 @@ exports.getTestById = async (req, res) => {
       `SELECT test_id, test_name, description, price, is_verified 
        FROM tests 
        WHERE test_id = $1 AND lab_id = $2`,
-      [id, labId]
+      [id, labId],
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Test not found in your catalog." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Test not found in your catalog." });
     }
 
     res.status(200).json({
       success: true,
-      test: result.rows
+      test: result.rows[0],
     });
-
   } catch (error) {
     console.error("Get Test By ID Error:", error);
     res.status(500).json({ success: false, message: "Internal Server Error." });
@@ -116,25 +125,30 @@ exports.updateTest = async (req, res) => {
          is_verified = FALSE
        WHERE test_id = $4 AND lab_id = $5 
        RETURNING test_id, test_name, description, price, is_verified;`,
-      [test_name, description, price, id, labId] 
+      [test_name, description, price, id, labId],
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Test not found or you do not have permission to edit it." 
+      return res.status(404).json({
+        success: false,
+        message: "Test not found or you do not have permission to edit it.",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: "Test updated successfully. It has been marked for re-verification.",
-      test: result.rows
+      message:
+        "Test updated successfully. It has been marked for re-verification.",
+      test: result.rows,
     });
-
   } catch (error) {
     console.error("Update Test Error:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error while updating test." });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Internal Server Error while updating test.",
+      });
   }
 };
 
@@ -148,23 +162,27 @@ exports.deleteTest = async (req, res) => {
       `DELETE FROM tests 
        WHERE test_id = $1 AND lab_id = $2 
        RETURNING test_id`,
-      [id, labId]
+      [id, labId],
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Test not found or already deleted." 
+      return res.status(404).json({
+        success: false,
+        message: "Test not found or already deleted.",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: "Test permanently removed from catalog."
+      message: "Test permanently removed from catalog.",
     });
-
   } catch (error) {
     console.error("Delete Test Error:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error while deleting test." });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Internal Server Error while deleting test.",
+      });
   }
 };

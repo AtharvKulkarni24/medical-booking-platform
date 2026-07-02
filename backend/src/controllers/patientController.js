@@ -4,10 +4,13 @@ const jwt = require("jsonwebtoken");
 const { blacklistToken, revokeRefreshToken } = require("../services/redisClient");
 
 // --- GET PATIENT PROFILE ---
+// --- GET PATIENT PROFILE ---
 exports.getPatientProfile = async (req, res) => {
   try {
     const patientId = req.user.id;
-    const query = `SELECT patient_id,name,email,phone_number,last_known_location FROM patients WHERE patient_id=$1`;
+    
+    // REMOVED: last_known_location
+    const query = `SELECT patient_id, name, email, phone_number, created_at FROM patients WHERE patient_id=$1`;
     const result = await db.query(query, [patientId]);
 
     if (result.rows.length == 0) {
