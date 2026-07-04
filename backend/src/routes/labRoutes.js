@@ -5,20 +5,19 @@ const { authenticateToken } = require("../middlewares/authMiddleware");
 const { authorizeRole } = require("../middlewares/roleMiddleware");
 const labController = require("../controllers/labController");
 
-// All patient routes require authentication and patient role
+// All routes below require authentication and lab role
 router.use(authenticateToken);
 router.use(authorizeRole("lab"));
 
-// The base path '/api/labs' will be defined in server.js
-router.get("/profile", authenticateToken, labController.getLabProfile);
-router.put("/profile", authenticateToken, labController.updateLabProfile);
+router.get("/profile", labController.getLabProfile);
+router.put("/profile", labController.updateLabProfile);
 router.patch("/profile/password", labController.updateLabPassword);
 
-//Time slots
-router.post("/slots", authenticateToken, labController.createSlot);
-router.get("/slots", authenticateToken, labController.getLabSlots);
-router.get("/slots/:id", authenticateToken, labController.getSlotById);
-router.put("/slots/:id", authenticateToken, labController.updateSlot);
-router.delete("/slots/:id", authenticateToken, labController.deleteSlot);
+// Time slots
+router.post("/slots", labController.createSlot);
+router.get("/slots", labController.getLabSlots);
+router.get("/slots/:id", labController.getSlotById);
+router.put("/slots/:id", labController.updateSlot);
+router.delete("/slots/:id", labController.deleteSlot);
 
 module.exports = router;

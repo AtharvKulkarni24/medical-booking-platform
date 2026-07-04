@@ -257,3 +257,128 @@ exports.getLabTestDetails = async (req, res) => {
         });
     }
 };
+
+// --- SEARCH LAB DIRECTORY (BY NAME & LOCATION) ---
+exports.searchLabDirectory = async (req, res) => {
+    try {
+        const { lab_name, lat, lng, page = 1, limit = 20 } = req.query;
+
+        // Location is required to find labs within 50km
+        if (lat === undefined || lng === undefined) {
+            return res.status(400).json({
+                success: false,
+                error: "Latitude and longitude are required to find nearby labs."
+            });
+        }
+
+        const userLat = parseFloat(lat);
+        const userLng = parseFloat(lng);
+
+        if (isNaN(userLat) || isNaN(userLng)) {
+            return res.status(400).json({ success: false, error: "Invalid coordinates." });
+        }
+
+        let pageNum = parseInt(page, 10) || 1;
+        let limitNum = parseInt(limit, 10) || 20;
+        const offset = (pageNum - 1) * limitNum;
+
+        // Dynamic Query Building
+        let nameFilter = "";
+        let queryParams = [userLng, userLat, limitNum, offset];
+
+        if (lab_name && lab_name.trim() !== "") {
+            nameFilter = "AND LOWER(name) LIKE LOWER($5)";
+            queryParams.push(`%${lab_name.trim()}%`); // Allows partial matches
+        }
+
+        const searchQuery = `
+            SELECT
+                lab_id,
+                name AS lab_name,
+                address_text,
+                average_rating,
+                ROUND(
+                    (ST_Distance(location_coordinates, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000.0)::numeric, 1
+                ) AS distance_km
+            FROM labs
+            WHERE is_verified = TRUE
+              AND ST_DWithin(
+                  location_coordinates,
+                  ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+                  50000 -- 50 km radius
+              )
+              ${nameFilter}
+            ORDER BY distance_km ASC
+            LIMIT $3 OFFSET $4;
+        `;
+
+        const result = await db.query(searchQuery, queryParams);
+
+        return res.status(200).json({
+            success: true,
+            results_count: result.rows.length,
+            labs: result.rows
+        });
+
+    } catch (error) {
+        console.error("Lab Directory Search Error:", error);
+        return res.status(500).json({ success: false, error: "Server error while searching lab directory." });
+    }
+};
+
+// --- GET SINGLE LAB DETAILS AND ALL ITS TESTS ---
+exports.getSingleLabDetails = async (req, res) => {
+    try {
+        const { lab_id } = req.params;
+
+        if (!lab_id || lab_id === 'undefined' || isNaN(parseInt(lab_id))) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Invalid Lab ID provided in the URL." 
+            });
+        }
+        
+        // 1. Fetch Lab Profile Details
+        const labQuery = `
+            SELECT 
+                lab_id, 
+                name AS lab_name, 
+                address_text, 
+                ST_Y(location_coordinates::geometry) AS latitude,
+                ST_X(location_coordinates::geometry) AS longitude,
+                average_rating, 
+                is_verified
+            FROM labs
+            WHERE lab_id = $1 AND is_verified = TRUE;
+        `;
+        const labResult = await db.query(labQuery, [lab_id]);
+
+        if (labResult.rows.length === 0) {
+            return res.status(404).json({ success: false, error: "Lab not found or not verified." });
+        }
+
+        // 2. Fetch All Tests Offered By This Lab
+        const testsQuery = `
+            SELECT 
+                test_id, 
+                test_name, 
+                price, 
+                description
+            FROM tests
+            WHERE lab_id = $1 AND is_verified = TRUE
+            ORDER BY test_name ASC;
+        `;
+        const testsResult = await db.query(testsQuery, [lab_id]);
+
+        return res.status(200).json({
+            success: true,
+            lab: labResult.rows[0],
+            tests: testsResult.rows,
+            total_tests: testsResult.rows.length
+        });
+
+    } catch (error) {
+        console.error("Get Single Lab Error:", error);
+        return res.status(500).json({ success: false, error: "Server error while fetching lab details." });
+    }
+};
