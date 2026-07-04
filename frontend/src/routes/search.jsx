@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import Footer from '../components/Footer' 
 
@@ -104,9 +104,15 @@ function SearchResultsPage() {
 
                 <div className="flex flex-col items-end w-full md:w-auto mt-4 md:mt-0">
                   <p className="text-2xl font-bold text-gray-900">₹{lab.price}</p>
-                  <button className="mt-3 w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition shadow-sm">
+                  
+                  {/* FIXED BUTTON LINK */}
+                  <Link 
+                    to={`/search/labs/${lab.lab_id}/tests/${lab.test_id}`}
+                    className="mt-3 w-full md:w-auto px-6 py-2 bg-blue-600 text-center text-white font-medium rounded-md hover:bg-blue-700 transition shadow-sm block"
+                  >
                     View Availability
-                  </button>
+                  </Link>
+                  
                 </div>
 
               </div>
@@ -125,7 +131,6 @@ function SearchResultsPage() {
 
       </main>
 
-      <Footer />
     </div>
   )
 }

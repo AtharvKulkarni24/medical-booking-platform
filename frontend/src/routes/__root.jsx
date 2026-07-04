@@ -1,5 +1,10 @@
 import { createRootRoute, Outlet, Link } from '@tanstack/react-router'
 
+// IMPORTANT: Adjust these paths if your files are in different folders!
+import { AuthProvider } from '../context/AuthContext'
+import Navbar from '../components/Navbar' 
+import Footer from '../components/Footer' 
+
 // 1. Create a custom 404 component
 function NotFound() {
   return (
@@ -24,35 +29,22 @@ export const Route = createRootRoute({
   notFoundComponent: NotFound, 
   
   component: () => (
-    <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center gap-8">
-              <Link to="/" className="text-2xl font-bold text-blue-600">
-                MedBook
-              </Link>
-              <div className="hidden md:flex gap-4">
-                <Link to="/labs/search" className="text-gray-600 hover:text-blue-600 font-medium">Find a Lab</Link>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <Link to="/login" className="px-4 py-2 text-blue-600 font-medium hover:bg-blue-50 rounded-md transition">
-                Log in
-              </Link>
-              <Link to="/register" className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition">
-                Sign up
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+    // 3. Wrap the entire app in the AuthProvider so every page knows who is logged in
+    <AuthProvider>
+      <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
+        
+        {/* 4. Use your new dynamic Navbar instead of the hardcoded one! */}
+        <Navbar />
 
-      {/* Main Content Area */}
-      <main className="flex-grow w-full flex flex-col">
-        <Outlet />
-      </main>
-    </div>
+        {/* Main Content Area */}
+        <main className="flex-grow w-full flex flex-col">
+          <Outlet />
+        </main>
+
+        {/* 5. Add your new Footer to the bottom of the app */}
+        <Footer />
+        
+      </div>
+    </AuthProvider>
   ),
 })

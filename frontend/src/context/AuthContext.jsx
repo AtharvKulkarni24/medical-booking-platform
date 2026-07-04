@@ -38,12 +38,16 @@ export const AuthProvider = ({ children }) => {
       throw new Error(data.error || 'Failed to login');
     }
 
+    const userWithRole={
+      ...data.user,
+      role:role
+    }
     // Save access token and user info
     setToken(data.accessToken);
-    setUser(data.user);
+    setUser(userWithRole);
     
     localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('user', JSON.stringify(data.user));
+    localStorage.setItem('user', JSON.stringify(userWithRole));
 
     return data;
   };

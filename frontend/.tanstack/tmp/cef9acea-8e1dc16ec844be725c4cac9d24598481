@@ -18,9 +18,6 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LabsRouteImport } from './routes/labs'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SearchLabsRouteImport } from './routes/search_.labs'
-import { Route as SearchLabsLab_idRouteImport } from './routes/search_.labs_.$lab_id'
-import { Route as SearchLabsLab_idTestsTest_idRouteImport } from './routes/search_.labs_.$lab_id.tests.$test_id'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -67,22 +64,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SearchLabsRoute = SearchLabsRouteImport.update({
-  id: '/search_/labs',
-  path: '/search/labs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SearchLabsLab_idRoute = SearchLabsLab_idRouteImport.update({
-  id: '/search_/labs_/$lab_id',
-  path: '/search/labs/$lab_id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SearchLabsLab_idTestsTest_idRoute =
-  SearchLabsLab_idTestsTest_idRouteImport.update({
-    id: '/tests/$test_id',
-    path: '/tests/$test_id',
-    getParentRoute: () => SearchLabsLab_idRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -94,9 +75,6 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/search': typeof SearchRoute
   '/terms': typeof TermsRoute
-  '/search/labs': typeof SearchLabsRoute
-  '/search/labs/$lab_id': typeof SearchLabsLab_idRouteWithChildren
-  '/search/labs/$lab_id/tests/$test_id': typeof SearchLabsLab_idTestsTest_idRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -108,9 +86,6 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/search': typeof SearchRoute
   '/terms': typeof TermsRoute
-  '/search/labs': typeof SearchLabsRoute
-  '/search/labs/$lab_id': typeof SearchLabsLab_idRouteWithChildren
-  '/search/labs/$lab_id/tests/$test_id': typeof SearchLabsLab_idTestsTest_idRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -123,9 +98,6 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/search': typeof SearchRoute
   '/terms': typeof TermsRoute
-  '/search_/labs': typeof SearchLabsRoute
-  '/search_/labs_/$lab_id': typeof SearchLabsLab_idRouteWithChildren
-  '/search_/labs_/$lab_id/tests/$test_id': typeof SearchLabsLab_idTestsTest_idRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -139,9 +111,6 @@ export interface FileRouteTypes {
     | '/register'
     | '/search'
     | '/terms'
-    | '/search/labs'
-    | '/search/labs/$lab_id'
-    | '/search/labs/$lab_id/tests/$test_id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -153,9 +122,6 @@ export interface FileRouteTypes {
     | '/register'
     | '/search'
     | '/terms'
-    | '/search/labs'
-    | '/search/labs/$lab_id'
-    | '/search/labs/$lab_id/tests/$test_id'
   id:
     | '__root__'
     | '/'
@@ -167,9 +133,6 @@ export interface FileRouteTypes {
     | '/register'
     | '/search'
     | '/terms'
-    | '/search_/labs'
-    | '/search_/labs_/$lab_id'
-    | '/search_/labs_/$lab_id/tests/$test_id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -182,8 +145,6 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   SearchRoute: typeof SearchRoute
   TermsRoute: typeof TermsRoute
-  SearchLabsRoute: typeof SearchLabsRoute
-  SearchLabsLab_idRoute: typeof SearchLabsLab_idRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -251,40 +212,8 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/search_/labs': {
-      id: '/search_/labs'
-      path: '/search/labs'
-      fullPath: '/search/labs'
-      preLoaderRoute: typeof SearchLabsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/search_/labs_/$lab_id': {
-      id: '/search_/labs_/$lab_id'
-      path: '/search/labs/$lab_id'
-      fullPath: '/search/labs/$lab_id'
-      preLoaderRoute: typeof SearchLabsLab_idRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/search_/labs_/$lab_id/tests/$test_id': {
-      id: '/search_/labs_/$lab_id/tests/$test_id'
-      path: '/tests/$test_id'
-      fullPath: '/search/labs/$lab_id/tests/$test_id'
-      preLoaderRoute: typeof SearchLabsLab_idTestsTest_idRouteImport
-      parentRoute: typeof SearchLabsLab_idRoute
-    }
   }
 }
-
-interface SearchLabsLab_idRouteChildren {
-  SearchLabsLab_idTestsTest_idRoute: typeof SearchLabsLab_idTestsTest_idRoute
-}
-
-const SearchLabsLab_idRouteChildren: SearchLabsLab_idRouteChildren = {
-  SearchLabsLab_idTestsTest_idRoute: SearchLabsLab_idTestsTest_idRoute,
-}
-
-const SearchLabsLab_idRouteWithChildren =
-  SearchLabsLab_idRoute._addFileChildren(SearchLabsLab_idRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -296,8 +225,6 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   SearchRoute: SearchRoute,
   TermsRoute: TermsRoute,
-  SearchLabsRoute: SearchLabsRoute,
-  SearchLabsLab_idRoute: SearchLabsLab_idRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
