@@ -95,6 +95,15 @@ export default function Navbar() {
                         My Profile
                       </Link>
                       
+                      {user?.role === 'patient' && (
+                        <Link 
+                          to="/appointments" 
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          My Appointments
+                        </Link>
+                      )}
+
                       {user.role === 'lab' && (
                         <Link
                           to="/dashboard"
