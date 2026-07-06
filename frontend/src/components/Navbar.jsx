@@ -35,13 +35,21 @@ export default function Navbar() {
           
           {/* Left Side: Logo and Navigation */}
           <div className="flex items-center gap-8">
-            <Link to="/" className="flex items-center gap-2">
+            {/* DYNAMIC LOGO LINK */}
+            <Link 
+              to={user?.role === 'lab' ? '/labs' : '/'} 
+              className="flex items-center gap-2"
+            >
               <span className="text-2xl font-bold text-blue-600">MedBook</span>
             </Link>
+            
             <div className="hidden md:flex gap-4">
-              <Link to="/search/labs" className="text-gray-600 hover:text-blue-600 font-medium transition">
-                Find a Lab
-              </Link>
+              {/* CONDITIONALLY RENDERED: Hidden if the user is a lab */}
+              {user?.role !== 'lab' && (
+                <Link to="/search/labs" className="text-gray-600 hover:text-blue-600 font-medium transition">
+                  Find a Lab
+                </Link>
+              )}
             </div>
           </div>
 
@@ -87,6 +95,7 @@ export default function Navbar() {
                 {isDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 overflow-hidden z-50">
                     <div className="py-1">
+                      
                       <Link
                         to="/profile"
                         onClick={() => setIsDropdownOpen(false)}
@@ -95,23 +104,50 @@ export default function Navbar() {
                         My Profile
                       </Link>
                       
+                      {/* --- PATIENT ONLY LINKS --- */}
                       {user?.role === 'patient' && (
                         <Link 
                           to="/appointments" 
+                          onClick={() => setIsDropdownOpen(false)}
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         >
                           My Appointments
                         </Link>
                       )}
 
-                      {user.role === 'lab' && (
-                        <Link
-                          to="/dashboard"
-                          onClick={() => setIsDropdownOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
-                        >
-                          Lab Dashboard
-                        </Link>
+                      {/* --- LAB ONLY LINKS --- */}
+                      {user?.role === 'lab' && (
+                        <>
+                          <Link
+                            to="/labs"
+                            onClick={() => setIsDropdownOpen(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                          >
+                            
+                            My Dashboard
+                          </Link>
+                          <Link
+                            to="/labs/tests"
+                            onClick={() => setIsDropdownOpen(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                          >
+                            My Tests
+                          </Link>
+                          <Link
+                            to="/labs/slots"
+                            onClick={() => setIsDropdownOpen(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                          >
+                            My Slots
+                          </Link>
+                          <Link
+                            to="/labs/reviews"
+                            onClick={() => setIsDropdownOpen(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                          >
+                            My Reviews
+                          </Link>
+                        </>
                       )}
 
                       <div className="border-t border-gray-100 my-1"></div>

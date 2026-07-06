@@ -1,5 +1,7 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from "react";
+// 1. Import useAuth
+import { useAuth } from "../context/AuthContext";
 
 export const Route = createFileRoute('/register')({
   component: Register,
@@ -7,6 +9,9 @@ export const Route = createFileRoute('/register')({
 
 function Register() {
   const navigate = useNavigate()
+  
+  // 2. Extract user and loading state
+  const { user, loading } = useAuth()
 
   // State
   const [role, setRole] = useState('patient')
@@ -27,6 +32,18 @@ function Register() {
   
   const addressInputRef = useRef(null)
 
+  // 3. THE REDIRECT RULE: Kick logged-in users out of the signup page
+  useEffect(() => {
+    if (!loading && user) {
+      if (user.role === 'lab') {
+        navigate({ to: '/labs', replace: true })
+      } else {
+        navigate({ to: '/', replace: true }) 
+      }
+    }
+  }, [user, loading, navigate])
+
+  // Map autocomplete logic
   useEffect(() => {
     let autocompleteListener; 
 
@@ -63,7 +80,6 @@ function Register() {
     e.preventDefault()
     setError('')
     
-    // Validate passwords match before proceeding
     if (formData.password !== formData.confirm_password) {
       setError("Passwords do not match. Please try again.")
       return
@@ -72,12 +88,10 @@ function Register() {
     setIsSubmitting(true)
 
     try {
-      //Determine the correct endpoint based on the role
       const endpoint=role==='patient'?
       'http://localhost:5000/api/patients/register'
       :'http://localhost:5000/api/labs/register';
 
-      // Create a clean payload to send to the backend (exclude confirm_password)
       const { confirm_password, address,...restData } = formData;
       const submitData=role==='patient'
       ?{
@@ -103,13 +117,21 @@ function Register() {
         throw new Error(data.error || 'Failed to register account');
       }
       
-      //Success! Redirect to login
       navigate({ to: '/login' })
     } catch (err) {
       setError(err.message)
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // 4. Wait for AuthContext to finish checking before rendering
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+      </div>
+    )
   }
 
   return (

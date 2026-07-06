@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 
 export const Route = createFileRoute('/login')({
@@ -13,8 +13,20 @@ function Login() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { login } = useAuth()
+  // 1. Extract user and loading state
+  const { login, user, loading } = useAuth()
   const navigate = useNavigate()
+
+  // 2. THE REDIRECT RULE: Kick logged-in users out of the login page
+  useEffect(() => {
+    if (!loading && user) {
+      if (user.role === 'lab') {
+        navigate({ to: '/labs', replace: true })
+      } else {
+        navigate({ to: '/', replace: true }) 
+      }
+    }
+  }, [user, loading, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -22,14 +34,12 @@ function Login() {
     setIsSubmitting(true)
 
     try {
-      // This calls the API via the AuthContext we just built!
       await login({ email, password }, role)
 
-      // Redirect based on the role they logged in as
       if (role === 'lab') {
-        navigate({ to: '/labs' })
+        navigate({ to: '/labs', replace: true })
       } else {
-        navigate({ to: '/' }) // Patient dashboard or home
+        navigate({ to: '/', replace: true })
       }
       
     } catch (err) {
@@ -37,6 +47,15 @@ function Login() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // 3. Wait for AuthContext to finish checking local storage before rendering form
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+      </div>
+    )
   }
 
   return (

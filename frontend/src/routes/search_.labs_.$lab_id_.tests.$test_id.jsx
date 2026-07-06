@@ -28,8 +28,6 @@ function BookingPage() {
   const [processingSlot, setProcessingSlot] = useState(null)
   
   const [showLoginModal, setShowLoginModal] = useState(false)
-  
-  // NEW: State to store successful booking details for the receipt modal
   const [bookingSuccess, setBookingSuccess] = useState(null) 
 
   useEffect(() => {
@@ -71,10 +69,29 @@ function BookingPage() {
   }
 
   const formatTime = (timeStr) => {
+    if (!timeStr) return '';
     const [h, m] = timeStr.split(':')
     const date = new Date()
     date.setHours(h, m)
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  }
+
+  // Prevents booking slots that have already passed today
+  const checkIsSlotPassed = (slotStartTime) => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (selectedDate !== today) return false;
+
+    const now = new Date();
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+
+    const [slotHours, slotMinutes] = slotStartTime.split(':').map(Number);
+
+    if (currentHours > slotHours) return true;
+    if (currentHours === slotHours && currentMinutes >= slotMinutes) return true;
+
+    return false;
   }
 
   const handleSlotClick = async (slot) => {
@@ -113,7 +130,7 @@ function BookingPage() {
       if (!orderResponse.ok) throw new Error(orderData.error || "Failed to create order")
 
       const options = {
-        key: "rzp_test_T8B7slOvzZmy9c", // ⚠️ PUT YOUR RAZORPAY TEST KEY HERE
+        key: "rzp_test_T8B7slOvzZmy9c", // Ensure your valid Razorpay key is used
         amount: orderData.order.amount,
         currency: orderData.order.currency,
         name: "Medical Booking Platform",
@@ -141,12 +158,11 @@ function BookingPage() {
             const verifyData = await verifyRes.json()
             if (!verifyRes.ok) throw new Error(verifyData.error || "Verification failed")
 
-            // NEW: Instead of an alert, trigger the Custom Success Modal with details!
             setBookingSuccess({
               test_name: labDetails.test_name,
               lab_name: labDetails.lab_name,
               date: formatDateLabel(selectedDate),
-              time: formatTime(slot.start_time),
+              time: `${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}`,
               amount: labDetails.price
             })
             
@@ -194,14 +210,10 @@ function BookingPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4 relative">
       
-      {/* ------------------------------------- */}
-      {/* SUCCESSFUL BOOKING MODAL (NEW)        */}
-      {/* ------------------------------------- */}
+      {/* SUCCESSFUL BOOKING MODAL */}
       {bookingSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 px-4 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-fade-in-up text-center">
-            
-            {/* Success Icon */}
             <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-green-100 mb-6">
               <span className="text-4xl text-green-600">🎉</span>
             </div>
@@ -209,7 +221,6 @@ function BookingPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
             <p className="text-gray-500 mb-6 text-sm">Your payment was successful and your slot is officially reserved.</p>
 
-            {/* Receipt Card */}
             <div className="bg-gray-50 rounded-xl p-5 text-left mb-8 border border-gray-100 shadow-inner">
               <div className="mb-4 pb-4 border-b border-gray-200">
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Diagnostic Test</p>
@@ -230,14 +241,12 @@ function BookingPage() {
               </div>
             </div>
 
-            {/* Navigate Home Button */}
             <button 
               onClick={() => navigate({ to: '/' })}
               className="w-full bg-green-600 text-white font-bold py-3.5 rounded-xl hover:bg-green-700 hover:shadow-lg transition-all"
             >
               Back to Home
             </button>
-            
           </div>
         </div>
       )}
@@ -337,36 +346,50 @@ function BookingPage() {
                 const remainingSpots = parseInt(slot.max_capacity) - parseInt(slot.current_bookings || 0);
                 const isProcessingThisSlot = processingSlot === slot.slot_id;
                 const isAnotherSlotProcessing = processingSlot !== null && !isProcessingThisSlot;
+                
+                const hasPassed = checkIsSlotPassed(slot.start_time);
 
                 return (
                   <button 
                     key={slot.slot_id} 
                     onClick={() => handleSlotClick(slot)}
-                    disabled={processingSlot !== null} 
-                    className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 flex flex-col items-center text-center group
+                    disabled={processingSlot !== null || hasPassed} 
+                    className={`p-4 rounded-xl border transition-all duration-200 flex flex-col items-center text-center group
                       ${isProcessingThisSlot 
                         ? 'bg-green-500 border-green-600 shadow-lg scale-105 animate-pulse' 
-                        : 'bg-white border-green-200 hover:border-green-500 hover:shadow-md hover:-translate-y-1'
+                        : hasPassed 
+                          ? 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
+                          : 'bg-white border-green-200 hover:border-green-500 hover:shadow-md hover:-translate-y-1 cursor-pointer'
                       }
                       ${isAnotherSlotProcessing ? 'opacity-40 grayscale pointer-events-none' : ''}
                     `}
                   >
-                    <div className={`text-lg font-bold mb-2 transition-colors ${
-                      isProcessingThisSlot ? 'text-white' : 'text-gray-900 group-hover:text-green-700'
+                    <div className={`text-base font-bold mb-1 transition-colors ${
+                      isProcessingThisSlot ? 'text-white' : hasPassed ? 'text-gray-500' : 'text-gray-900 group-hover:text-green-700'
                     }`}>
                       {formatTime(slot.start_time)}
+                    </div>
+                    
+                    <div className={`text-xs mb-3 transition-colors ${
+                      isProcessingThisSlot ? 'text-green-100' : hasPassed ? 'text-gray-400' : 'text-gray-500 group-hover:text-green-600'
+                    }`}>
+                      to {formatTime(slot.end_time)}
                     </div>
                     
                     <span className={`text-xs font-bold px-3 py-1 rounded-full ${
                       isProcessingThisSlot
                         ? 'bg-green-700 text-white' 
-                        : remainingSpots <= 2 
-                          ? 'bg-orange-100 text-orange-700' 
-                          : 'bg-green-100 text-green-700'
+                        : hasPassed
+                          ? 'bg-gray-200 text-gray-500'
+                          : remainingSpots <= 2 
+                            ? 'bg-orange-100 text-orange-700' 
+                            : 'bg-green-100 text-green-700'
                     }`}>
                       {isProcessingThisSlot 
                         ? 'Confirming...' 
-                        : (remainingSpots > 0 ? `${remainingSpots} spots left` : 'Available')}
+                        : hasPassed 
+                          ? 'Time Passed' 
+                          : (remainingSpots > 0 ? `${remainingSpots} spots left` : 'Available')}
                     </span>
                   </button>
                 )

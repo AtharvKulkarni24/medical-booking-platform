@@ -1,310 +1,178 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";
+import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
 
-export const Route = createFileRoute("/labs")({
-  component: LabsDashboard,
-});
+export const Route = createFileRoute('/labs')({
+  component: LabDashboard,
+})
 
-function LabsDashboard() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("tests");
+function LabDashboard() {
+  const navigate = useNavigate()
+  
+  const [stats, setStats] = useState({
+    total_tests: 0,
+    average_rating: "0.0",
+    completed_appointments: 0,
+    upcoming_bookings: 0
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // Protect the route: Only logged-in labs can see this
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        navigate({ to: "/login" });
-      } else if (user && !user.is_verified && user.role === "lab") {
-        // adjust based on your user object
-        // Optional: Handle unverified labs
+    const fetchDashboardStats = async () => {
+      const token = localStorage.getItem('accessToken')
+      const userString = localStorage.getItem('user')
+      const user = userString ? JSON.parse(userString) : null
+
+      // Redirect if not a logged-in Lab
+      if (!token || user?.role !== 'lab') {
+        navigate({ to: '/login', search: { redirect: '/labs' } })
+        return
+      }
+
+      try {
+        const response = await fetch('http://localhost:5000/api/labs/dashboard-stats', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        const result = await response.json()
+
+        if (!response.ok) throw new Error(result.error || 'Failed to fetch dashboard statistics')
+
+        setStats(result.data)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setIsLoading(false)
       }
     }
-  }, [user, loading, navigate]);
 
-  if (loading)
-    return <div className="p-10 text-center">Loading dashboard...</div>;
+    fetchDashboardStats()
+  }, [navigate])
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row w-full">
-      {/* SIDEBAR */}
-      <aside className="w-full md:w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Lab Dashboard</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {user?.name || "Diagnostic Center"}
-          </p>
-        </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <SidebarButton
-            active={activeTab === "tests"}
-            onClick={() => setActiveTab("tests")}
-            icon="🧪"
-            label="Manage Tests"
-          />
-          <SidebarButton
-            active={activeTab === "slots"}
-            onClick={() => setActiveTab("slots")}
-            icon="🕒"
-            label="Time Slots"
-          />
-          <SidebarButton
-            active={activeTab === "appointments"}
-            onClick={() => setActiveTab("appointments")}
-            icon="📅"
-            label="Appointments"
-          />
-          <SidebarButton
-            active={activeTab === "reviews"}
-            onClick={() => setActiveTab("reviews")}
-            icon="⭐"
-            label="Reviews"
-          />
-        </nav>
-      </aside>
-
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 p-6 md:p-10 overflow-y-auto">
-        {activeTab === "tests" && <TestsManager />}
-        {activeTab === "slots" && <TimeSlotsManager />}
-        {activeTab === "appointments" && <AppointmentsViewer />}
-        {activeTab === "reviews" && <ReviewsViewer />}
-      </main>
-    </div>
-  );
-}
-
-// ==========================================
-// SIDEBAR BUTTON COMPONENT
-// ==========================================
-function SidebarButton({ active, onClick, icon, label }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-colors ${
-        active
-          ? "bg-blue-50 text-blue-700"
-          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-      }`}
-    >
-      <span className="text-lg">{icon}</span>
-      {label}
-    </button>
-  );
-}
-
-// ==========================================
-// 1. TESTS MANAGER TAB
-// ==========================================
-function TestsManager() {
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Manage Tests</h2>
-          <p className="text-gray-500 text-sm">
-            Add, edit, or remove tests from your catalog.
-          </p>
-        </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition font-medium">
-          + Add New Test
-        </button>
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+        <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-500 font-medium">Loading your dashboard...</p>
       </div>
+    )
+  }
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200 text-sm text-gray-500">
-              <th className="p-4 font-medium">Test Name</th>
-              <th className="p-4 font-medium">Price (₹)</th>
-              <th className="p-4 font-medium">Status</th>
-              <th className="p-4 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {/* Mock Data Row */}
-            <tr className="hover:bg-gray-50 transition">
-              <td className="p-4">
-                <p className="font-medium text-gray-900">
-                  Complete Blood Count (CBC)
-                </p>
-                <p className="text-xs text-gray-500">
-                  Checks overall health parameters.
-                </p>
-              </td>
-              <td className="p-4 font-medium text-gray-900">500</td>
-              <td className="p-4">
-                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                  Verified
-                </span>
-              </td>
-              <td className="p-4 text-right space-x-3">
-                <button className="text-blue-600 hover:underline text-sm font-medium">
-                  Edit
-                </button>
-                <button className="text-red-600 hover:underline text-sm font-medium">
-                  Delete
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ==========================================
-// 2. TIME SLOTS MANAGER TAB
-// ==========================================
-function TimeSlotsManager() {
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Weekly Time Slots
-          </h2>
-          <p className="text-gray-500 text-sm">
-            Define your operating hours and capacities.
-          </p>
-        </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition font-medium">
-          + Add Slot
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Mock Slot Card */}
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex justify-between items-start mb-2">
-            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-md text-xs font-bold uppercase tracking-wide">
-              Monday
-            </span>
-            <div className="space-x-2">
-              <button className="text-gray-400 hover:text-blue-600">✏️</button>
-              <button className="text-gray-400 hover:text-red-600">🗑️</button>
-            </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      
+      {/* MAIN CONTENT AREA (Left Side) */}
+      <div className="flex-1 p-6 md:p-10">
+        <div className="max-w-5xl mx-auto">
+          
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Lab Dashboard</h1>
+            <p className="text-gray-500">Welcome back! Here is an overview of your diagnostic center.</p>
           </div>
-          <h3 className="text-lg font-bold text-gray-900">
-            09:00 AM - 10:00 AM
-          </h3>
-          <p className="text-gray-500 text-sm mt-1">
-            Max Capacity:{" "}
-            <span className="font-medium text-gray-900">5 patients</span>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-// ==========================================
-// 3. APPOINTMENTS VIEWER TAB
-// ==========================================
-function AppointmentsViewer() {
-  return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">
-          Patient Appointments
-        </h2>
-        <p className="text-gray-500 text-sm">
-          View who is coming in for specific tests and times.
-        </p>
-      </div>
+          {error && (
+            <div className="p-4 mb-6 bg-red-50 text-red-700 rounded-xl border border-red-100">
+              {error}
+            </div>
+          )}
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-500 mb-1">
-            Select Date
-          </label>
-          <input
-            type="date"
-            className="w-full p-2 border border-gray-300 rounded-md outline-none focus:border-blue-500"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-500 mb-1">
-            Select Time Slot
-          </label>
-          <select className="w-full p-2 border border-gray-300 rounded-md outline-none focus:border-blue-500">
-            <option>09:00 AM - 10:00 AM</option>
-            <option>10:00 AM - 11:00 AM</option>
-          </select>
-        </div>
-        <div className="flex items-end">
-          <button className="bg-gray-900 text-white px-6 py-2 rounded-md hover:bg-gray-800 font-medium h-[42px]">
-            Filter
-          </button>
-        </div>
-      </div>
-
-      {/* Patients List */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200 text-sm text-gray-500">
-              <th className="p-4 font-medium">Patient Name</th>
-              <th className="p-4 font-medium">Contact</th>
-              <th className="p-4 font-medium">Test Booked</th>
-              <th className="p-4 font-medium text-right">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            <tr className="hover:bg-gray-50 transition">
-              <td className="p-4 font-medium text-gray-900">Rahul Sharma</td>
-              <td className="p-4 text-gray-600">+91 9876543210</td>
-              <td className="p-4 text-gray-900">Lipid Profile</td>
-              <td className="p-4 text-right">
-                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                  Confirmed
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ==========================================
-// 4. REVIEWS VIEWER TAB
-// ==========================================
-function ReviewsViewer() {
-  return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Patient Reviews</h2>
-        <p className="text-gray-500 text-sm">
-          See what patients are saying about your services.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Mock Review Card */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex gap-3 items-center">
-              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-500">
-                P
+          {/* METRICS GRID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+            
+            {/* Metric 1: Tests Available */}
+            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-5 hover:shadow-md transition">
+              <div className="h-14 w-14 rounded-full bg-blue-50 flex items-center justify-center text-2xl">
+                🧪
               </div>
               <div>
-                <h4 className="font-bold text-gray-900">Priya Singh</h4>
-                <p className="text-xs text-gray-500">2 days ago</p>
+                <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-1">Available Tests</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.total_tests}</p>
               </div>
             </div>
-            <div className="text-yellow-400">⭐⭐⭐⭐⭐</div>
+
+            {/* Metric 2: Upcoming Bookings */}
+            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-5 hover:shadow-md transition">
+              <div className="h-14 w-14 rounded-full bg-indigo-50 flex items-center justify-center text-2xl">
+                📅
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-1">Upcoming Bookings</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.upcoming_bookings}</p>
+              </div>
+            </div>
+
+            {/* Metric 3: Completed Appointments */}
+            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-5 hover:shadow-md transition">
+              <div className="h-14 w-14 rounded-full bg-green-50 flex items-center justify-center text-2xl">
+                ✅
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-1">Completed Tests</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.completed_appointments}</p>
+              </div>
+            </div>
+
+            {/* Metric 4: Average Rating */}
+            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-5 hover:shadow-md transition">
+              <div className="h-14 w-14 rounded-full bg-yellow-50 flex items-center justify-center text-2xl">
+                ⭐
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-1">Average Rating</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.average_rating}<span className="text-lg text-gray-400 font-medium"> / 5</span></p>
+              </div>
+            </div>
+
           </div>
-          <p className="text-gray-700 text-sm">
-            "Very clean facility and the staff was very professional. Got my
-            reports on time as promised!"
-          </p>
+          
         </div>
       </div>
+
+      {/* RIGHT SIDEBAR NAVIGATION */}
+      <aside className="w-full md:w-72 bg-white border-l border-gray-200 p-6 flex flex-col min-h-full shadow-sm">
+        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 px-3">Lab Menu</h2>
+        
+        <nav className="flex flex-col gap-2">
+          <Link 
+            to="/labs" 
+            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium bg-blue-50 text-blue-700 transition"
+          >
+            <span className="text-lg">📊</span> Dashboard
+          </Link>
+          
+          <Link 
+            to="/labs/tests" 
+            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition"
+          >
+            <span className="text-lg">🧪</span> Manage Tests
+          </Link>
+
+          <Link 
+            to="/labs/slots" 
+            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition"
+          >
+            <span className="text-lg">🕒</span> Time Slots
+          </Link>
+
+          <Link 
+            to="/labs/reviews" 
+            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition"
+          >
+            <span className="text-lg">⭐</span> Patient Reviews
+          </Link>
+        </nav>
+
+        <div className="mt-auto pt-8">
+          <Link 
+            to="/profile" 
+            className="block w-full text-center px-4 py-3 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition"
+          >
+            ⚙️ Lab Settings
+          </Link>
+        </div>
+      </aside>
+
     </div>
-  );
+  )
 }

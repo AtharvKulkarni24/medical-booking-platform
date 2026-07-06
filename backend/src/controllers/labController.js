@@ -1,4 +1,4 @@
-const db = require("../config/db"); // Using 'db' to match your other controllers
+const db = require("../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const {
@@ -6,13 +6,41 @@ const {
   revokeRefreshToken,
 } = require("../services/redisClient");
 
+// --- GET LAB DASHBOARD STATS ---
+exports.getDashboardStats = async (req, res) => {
+  try {
+    const labId = req.user.id;
+
+    // Run all 4 queries simultaneously using Promise.all for speed
+    const [testsQuery, labQuery, completedQuery, upcomingQuery] = await Promise.all([
+      db.query(`SELECT COUNT(*) FROM tests WHERE lab_id = $1`, [labId]),
+      db.query(`SELECT average_rating FROM labs WHERE lab_id = $1`, [labId]),
+      db.query(`SELECT COUNT(*) FROM appointments WHERE lab_id = $1 AND status = 'COMPLETED'`, [labId]),
+      db.query(`SELECT COUNT(*) FROM appointments WHERE lab_id = $1 AND status = 'CONFIRMED' AND appointment_date >= CURRENT_DATE`, [labId])
+    ]);
+
+    const stats = {
+      total_tests: parseInt(testsQuery.rows[0].count, 10),
+      average_rating: labQuery.rows[0].average_rating || "0.0",
+      completed_appointments: parseInt(completedQuery.rows[0].count, 10),
+      upcoming_bookings: parseInt(upcomingQuery.rows[0].count, 10)
+    };
+
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error("Dashboard Stats Error:", error);
+    res.status(500).json({ success: false, error: "Server error while fetching dashboard stats." });
+  }
+};
+
 // --- GET LAB PROFILE ---
 exports.getLabProfile = async (req, res) => {
   try {
     const labId = req.user.id;
 
-    // Explicitly select columns to avoid sending password_hash
-    // Extract lat/lng from the PostGIS geography object for the frontend
     const query = `
       SELECT 
         lab_id, 
@@ -50,13 +78,12 @@ exports.getLabProfile = async (req, res) => {
   }
 };
 
-// --- UPDATE LAB PROFILE (Bonus) ---
+// --- UPDATE LAB PROFILE ---
 exports.updateLabProfile = async (req, res) => {
   try {
     const labId = req.user.id;
     const { name, address_text, latitude, longitude } = req.body;
 
-    // FIX: Removed the ::geography cast on the THEN line
     const query = `
       UPDATE labs 
       SET 
@@ -114,71 +141,50 @@ exports.updateLabPassword = async (req, res) => {
       });
     }
 
-    // 1. Fetch current hash from the labs table
     const userQuery = await db.query(
       "SELECT password_hash FROM labs WHERE lab_id = $1",
       [labId],
     );
 
     if (userQuery.rows.length === 0) {
-      return res
-        .status(404)
-        .json({ success: false, error: "Diagnostic center not found." });
+      return res.status(404).json({ success: false, error: "Diagnostic center not found." });
     }
     const currentHash = userQuery.rows[0].password_hash;
 
-    // 2. Verify current password
     const isMatch = await bcrypt.compare(current_password, currentHash);
     if (!isMatch) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          error: "Incorrect current password. Cannot update.",
-        });
+      return res.status(401).json({
+        success: false,
+        error: "Incorrect current password. Cannot update.",
+      });
     }
 
-    // 3. Basic password strength checks
-    const passwordRegex =
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$/;
-    const commonPasswords = [
-      "password",
-      "12345678",
-      "qwerty",
-      "letmein",
-      "admin",
-    ];
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$/;
+    const commonPasswords = ["password", "12345678", "qwerty", "letmein", "admin"];
 
     if (!passwordRegex.test(new_password)) {
       return res.status(400).json({
         success: false,
-        error:
-          "New password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+        error: "New password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
       });
     }
 
     const lowerNew = new_password.toLowerCase();
     if (commonPasswords.includes(lowerNew)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "Please choose a less common password.",
-        });
+      return res.status(400).json({
+        success: false,
+        error: "Please choose a less common password.",
+      });
     }
 
-    // 4. Prevent reusing the same password
     const isSameAsCurrent = await bcrypt.compare(new_password, currentHash);
     if (isSameAsCurrent) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "New password must be different from the current password.",
-        });
+      return res.status(400).json({
+        success: false,
+        error: "New password must be different from the current password.",
+      });
     }
 
-    // 5. Hash and store the new password
     const salt = await bcrypt.genSalt(10);
     const newPasswordHash = await bcrypt.hash(new_password, salt);
 
@@ -187,7 +193,6 @@ exports.updateLabPassword = async (req, res) => {
       labId,
     ]);
 
-    // 6. Security: Force re-login by revoking tokens
     try {
       await revokeRefreshToken(labId);
     } catch (err) {
@@ -195,16 +200,12 @@ exports.updateLabPassword = async (req, res) => {
     }
 
     try {
-      const authHeader =
-        req.headers["authorization"] || req.headers["Authorization"];
+      const authHeader = req.headers["authorization"] || req.headers["Authorization"];
       const token = authHeader && authHeader.split(" ")[1];
       if (token) {
         const decoded = jwt.decode(token);
         if (decoded && decoded.exp) {
-          const expiresIn = Math.max(
-            decoded.exp - Math.floor(Date.now() / 1000),
-            0,
-          );
+          const expiresIn = Math.max(decoded.exp - Math.floor(Date.now() / 1000), 0);
           await blacklistToken(token, expiresIn);
         }
       }
@@ -218,9 +219,7 @@ exports.updateLabPassword = async (req, res) => {
     });
   } catch (error) {
     console.error("Lab Password Update Error:", error);
-    res
-      .status(500)
-      .json({ success: false, error: "Server error during password update." });
+    res.status(500).json({ success: false, error: "Server error during password update." });
   }
 };
 
@@ -229,7 +228,6 @@ exports.getLabSlots = async (req, res) => {
   try {
     const labId = req.user.id;
 
-    // Fetch the weekly schedule template (ordered by day, then time)
     const result = await db.query(
       `SELECT slot_id, day_of_week, start_time, end_time, max_capacity
        FROM time_slots
@@ -289,22 +287,18 @@ exports.createSlot = async (req, res) => {
       });
     }
 
-    // Validate Day of Week (0 = Sunday, 6 = Saturday)
     if (day_of_week < 0 || day_of_week > 6) {
       return res.status(400).json({ success: false, error: "Day of week must be between 0 and 6." });
     }
 
-    // 1. Validate Time Logic
     if (start_time >= end_time) {
       return res.status(400).json({ success: false, error: "End time must be after start time." });
     }
 
-    // 2. Validate Capacity
     if (max_capacity <= 0) {
       return res.status(400).json({ success: false, error: "Maximum capacity must be greater than 0." });
     }
 
-   // 3. Prevent Overlapping Slots (On the same day!)
     const overlapCheck = await db.query(
       `SELECT 1 FROM time_slots 
        WHERE lab_id = $1 
@@ -321,7 +315,6 @@ exports.createSlot = async (req, res) => {
       });
     }
 
-    // 4. Execute Insert
     const result = await db.query(
       `INSERT INTO time_slots (lab_id, day_of_week, start_time, end_time, max_capacity)
        VALUES ($1, $2, $3, $4, $5)
@@ -347,7 +340,6 @@ exports.updateSlot = async (req, res) => {
     const { id } = req.params;
     const { day_of_week, start_time, end_time, max_capacity } = req.body;
 
-    // 1. Check if slot exists
     const existingSlot = await db.query(
       `SELECT * FROM time_slots WHERE slot_id = $1 AND lab_id = $2`,
       [id, labId]
@@ -357,8 +349,6 @@ exports.updateSlot = async (req, res) => {
     }
 
     const slot = existingSlot.rows[0];
-
-    // 2. Compute final values based on partial inputs (??)
     const newDay = day_of_week ?? slot.day_of_week;
     const newStart = start_time ?? slot.start_time;
     const newEnd = end_time ?? slot.end_time;
@@ -368,7 +358,6 @@ exports.updateSlot = async (req, res) => {
       return res.status(400).json({ success: false, error: "Day of week must be between 0 and 6." });
     }
 
-    // 3. Validate Computed Time Logic
     if (newStart >= newEnd) {
       return res.status(400).json({ success: false, error: "End time must be after start time." });
     }
@@ -377,8 +366,23 @@ exports.updateSlot = async (req, res) => {
       return res.status(400).json({ success: false, error: "Maximum capacity must be greater than 0." });
     }
 
-    // 4. Validate Capacity against ACTUAL upcoming appointments
-    // We check if any single future day already has more bookings than the new capacity
+    const futureAppointments = await db.query(
+      `SELECT COUNT(*) as count FROM appointments WHERE slot_id = $1 AND appointment_date >= CURRENT_DATE AND status = 'CONFIRMED'`,
+      [id]
+    );
+    const hasFutureBookings = parseInt(futureAppointments.rows[0].count) > 0;
+
+    if (hasFutureBookings && (
+        newDay !== slot.day_of_week || 
+        newStart !== slot.start_time || 
+        newEnd !== slot.end_time
+    )) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Cannot change the day or time of this slot because patients have already booked it. You can only update the capacity." 
+      });
+    }
+
     const bookingCheck = await db.query(
       `SELECT COUNT(*) as daily_count 
        FROM appointments 
@@ -393,11 +397,10 @@ exports.updateSlot = async (req, res) => {
     if (newCapacity < maxActiveBookings) {
       return res.status(400).json({
         success: false,
-        error: `Cannot reduce capacity. There is an upcoming date with ${maxActiveBookings} active bookings.`,
+        error: `Cannot reduce capacity below ${maxActiveBookings} due to existing active bookings.`,
       });
     }
 
-    // 5. Prevent Overlapping Slots (excluding current slot)
     const overlapCheck = await db.query(
       `SELECT 1 FROM time_slots 
        WHERE lab_id = $1 
@@ -409,13 +412,9 @@ exports.updateSlot = async (req, res) => {
     );
 
     if (overlapCheck.rowCount > 0) {
-      return res.status(409).json({
-        success: false,
-        error: "These updated times overlap with another existing slot on this day.",
-      });
+      return res.status(409).json({ success: false, error: "These updated times overlap with another existing slot on this day." });
     }
 
-    // 6. Execute Update
     const updatedSlot = await db.query(
       `UPDATE time_slots
        SET day_of_week = $1, start_time = $2, end_time = $3, max_capacity = $4
@@ -424,11 +423,7 @@ exports.updateSlot = async (req, res) => {
       [newDay, newStart, newEnd, newCapacity, id, labId]
     );
 
-    return res.status(200).json({
-      success: true,
-      message: "Slot updated successfully.",
-      slot: updatedSlot.rows[0],
-    });
+    return res.status(200).json({ success: true, message: "Slot updated successfully.", slot: updatedSlot.rows[0] });
   } catch (error) {
     console.error("Update slot error:", error);
     return res.status(500).json({ success: false, error: "Internal server error while updating slot." });
@@ -441,7 +436,6 @@ exports.deleteSlot = async (req, res) => {
     const labId = req.user.id;
     const { id } = req.params;
 
-    // 1. Check if slot exists
     const slotResult = await db.query(
       `SELECT * FROM time_slots WHERE slot_id = $1 AND lab_id = $2`,
       [id, labId]
@@ -451,21 +445,21 @@ exports.deleteSlot = async (req, res) => {
       return res.status(404).json({ success: false, error: "Slot not found or unauthorized." });
     }
 
-    // 2. Safety check: Check if this slot has ANY upcoming appointments attached to it
     const futureAppointments = await db.query(
-      `SELECT COUNT(*) FROM appointments 
-       WHERE slot_id = $1 AND appointment_date >= CURRENT_DATE`,
+      `SELECT COUNT(*) as count FROM appointments 
+       WHERE slot_id = $1 
+       AND appointment_date >= CURRENT_DATE 
+       AND status = 'CONFIRMED'`,
       [id]
     );
 
     if (parseInt(futureAppointments.rows[0].count) > 0) {
       return res.status(400).json({
         success: false,
-        error: "Cannot delete this template. There are active patient appointments scheduled for future dates.",
+        error: "Cannot delete this time slot. There are patients with active, confirmed bookings for this time in the future."
       });
     }
 
-    // 3. Execute Delete
     await db.query(
       `DELETE FROM time_slots WHERE slot_id = $1 AND lab_id = $2`,
       [id, labId]
@@ -473,10 +467,19 @@ exports.deleteSlot = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Slot deleted successfully.",
+      message: "Time slot deleted successfully.",
     });
   } catch (error) {
     console.error("Delete slot error:", error);
+    
+    // Catch foreign key constraint errors
+    if (error.code === '23503') {
+       return res.status(400).json({ 
+         success: false, 
+         error: "Cannot delete this slot because historical appointment records are tied to it. Try updating its capacity to 0 instead." 
+       });
+    }
+
     return res.status(500).json({ success: false, error: "Internal server error while deleting slot." });
   }
 };

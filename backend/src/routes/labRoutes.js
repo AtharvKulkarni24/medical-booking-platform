@@ -9,6 +9,10 @@ const labController = require("../controllers/labController");
 router.use(authenticateToken);
 router.use(authorizeRole("lab"));
 
+// Dashboard Stats (NEW)
+router.get("/dashboard-stats", labController.getDashboardStats);
+
+// Profile
 router.get("/profile", labController.getLabProfile);
 router.put("/profile", labController.updateLabProfile);
 router.patch("/profile/password", labController.updateLabPassword);
