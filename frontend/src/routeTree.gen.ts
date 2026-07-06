@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RefundRouteImport } from './routes/refund'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -34,6 +35,11 @@ const TermsRoute = TermsRouteImport.update({
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewsRoute = ReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterRoute = RegisterRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
   '/register': typeof RegisterRoute
+  '/reviews': typeof ReviewsRoute
   '/search': typeof SearchRoute
   '/terms': typeof TermsRoute
   '/labs/reviews': typeof LabsReviewsRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
   '/register': typeof RegisterRoute
+  '/reviews': typeof ReviewsRoute
   '/search': typeof SearchRoute
   '/terms': typeof TermsRoute
   '/labs/reviews': typeof LabsReviewsRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
   '/register': typeof RegisterRoute
+  '/reviews': typeof ReviewsRoute
   '/search': typeof SearchRoute
   '/terms': typeof TermsRoute
   '/labs_/reviews': typeof LabsReviewsRoute
@@ -174,6 +183,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/refund'
     | '/register'
+    | '/reviews'
     | '/search'
     | '/terms'
     | '/labs/reviews'
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/refund'
     | '/register'
+    | '/reviews'
     | '/search'
     | '/terms'
     | '/labs/reviews'
@@ -210,6 +221,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/refund'
     | '/register'
+    | '/reviews'
     | '/search'
     | '/terms'
     | '/labs_/reviews'
@@ -229,6 +241,7 @@ export interface RootRouteChildren {
   ProfileRoute: typeof ProfileRoute
   RefundRoute: typeof RefundRoute
   RegisterRoute: typeof RegisterRoute
+  ReviewsRoute: typeof ReviewsRoute
   SearchRoute: typeof SearchRoute
   TermsRoute: typeof TermsRoute
   LabsReviewsRoute: typeof LabsReviewsRoute
@@ -253,6 +266,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reviews': {
+      id: '/reviews'
+      path: '/reviews'
+      fullPath: '/reviews'
+      preLoaderRoute: typeof ReviewsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register': {
@@ -365,6 +385,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileRoute: ProfileRoute,
   RefundRoute: RefundRoute,
   RegisterRoute: RegisterRoute,
+  ReviewsRoute: ReviewsRoute,
   SearchRoute: SearchRoute,
   TermsRoute: TermsRoute,
   LabsReviewsRoute: LabsReviewsRoute,

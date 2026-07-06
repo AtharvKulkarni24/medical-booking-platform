@@ -1,6 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import logo from '../assets/MedBook_logo.png'
 
 export default function Navbar() {
   const navigate = useNavigate()
@@ -40,15 +41,21 @@ export default function Navbar() {
               to={user?.role === 'lab' ? '/labs' : '/'} 
               className="flex items-center gap-2"
             >
-              <span className="text-2xl font-bold text-blue-600">MedBook</span>
+              <img src={logo} alt="MedBook Logo" className="h-24 w-auto" />
+              <span className="text-2xl font-bold "> <span className="text-cyan-500">Med</span><span className="text-blue-900">Book</span></span>
             </Link>
             
             <div className="hidden md:flex gap-4">
               {/* CONDITIONALLY RENDERED: Hidden if the user is a lab */}
               {user?.role !== 'lab' && (
-                <Link to="/search/labs" className="text-gray-600 hover:text-blue-600 font-medium transition">
-                  Find a Lab
-                </Link>
+                <Link
+  to="/search/labs"
+  className="relative inline-flex items-center justify-center px-6 py-2.5 rounded-lg font-semibold text-white overflow-hidden group bg-gradient-to-r from-cyan-500 to-blue-900 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/30"
+>
+  <span className="absolute inset-0 bg-linear-to-r from-blue-900 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></span>
+
+  <span className="relative z-10">Find a Lab</span>
+</Link>
               )}
             </div>
           </div>
@@ -106,6 +113,7 @@ export default function Navbar() {
                       
                       {/* --- PATIENT ONLY LINKS --- */}
                       {user?.role === 'patient' && (
+                        <>
                         <Link 
                           to="/appointments" 
                           onClick={() => setIsDropdownOpen(false)}
@@ -113,6 +121,15 @@ export default function Navbar() {
                         >
                           My Appointments
                         </Link>
+
+                        <Link 
+                          to="/reviews" 
+                          onClick={() => setIsDropdownOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          My Reviews
+                        </Link>
+                        </>
                       )}
 
                       {/* --- LAB ONLY LINKS --- */}

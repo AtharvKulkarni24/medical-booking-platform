@@ -1,23 +1,47 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute('/refund')({
+export const Route = createFileRoute("/refund")({
   component: RefundPolicy,
-})
+});
 
+// ... (imports remain the same)
 function RefundPolicy() {
   return (
-    <div className="container mx-auto px-4 max-w-4xl py-12">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Refund Policy</h1>
-      <div className="text-gray-700 space-y-4">
-        <p className="text-sm text-gray-500">Last updated: {new Date().toLocaleDateString()}</p>
-        <p>We want you to be satisfied with your experience on MedConnect. Here is how our refund process works.</p>
-        
-        <h2 className="text-xl font-semibold text-gray-900 mt-6 mb-3">1. Cancellation by Patient</h2>
-        <p>Tests cancelled at least 24 hours before the scheduled sample collection are eligible for a full refund. Cancellations made within 24 hours may be subject to a nominal cancellation fee.</p>
-        
-        <h2 className="text-xl font-semibold text-gray-900 mt-6 mb-3">2. Refund Processing</h2>
-        <p>Approved refunds will be processed within 5-7 business days. The amount will automatically be credited back to your original payment method.</p>
+    <div className="min-h-screen bg-gray-50 py-16">
+      <div className="container mx-auto max-w-4xl px-6">
+        <div className="rounded-3xl bg-white shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-green-600 px-8 py-10 text-white">
+            <h1 className="text-4xl font-bold">Refund Policy</h1>
+            <p className="mt-2 text-green-50">Simple, fair, and transparent.</p>
+          </div>
+
+          <div className="space-y-8 p-8 text-gray-700 leading-8">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">1. Patient-Initiated Cancellations</h2>
+              <p>Cancellations made <strong>more than 24 hours</strong> before the scheduled appointment slot are eligible for a full refund. Cancellations made <strong>within 24 hours</strong> of the slot may be subject to a non-refundable booking fee or laboratory service charge.</p>
+            </div>
+
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">2. Lab-Initiated Cancellations</h2>
+              <p>If a lab cancels a booking for any reason (operational, staff unavailability), MedBook will automatically process a 100% refund to the original payment method, or provide an option to re-book with a different lab.</p>
+            </div>
+
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">3. No-Show Policy</h2>
+              <p>If a patient fails to show up for the appointment at the designated laboratory without prior cancellation, the booking fee is generally non-refundable.</p>
+            </div>
+
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">4. Processing Time</h2>
+              <p>Approved refunds are processed through our payment gateway and typically reflect in your account within <strong>5 to 7 business days</strong> depending on your bank.</p>
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-lg text-sm italic">
+              Need help with a refund? Contact us at support@medbook.com with your Appointment ID.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  )
+  );
 }
