@@ -5,6 +5,17 @@ export const Route = createFileRoute('/labs_/tests')({
   component: ManageTestsPage,
 })
 
+// Define the allowed popular tests outside the component
+const popularTests = [
+  { id: 1, name: 'Blood Test', description: 'Evaluates overall health and detects a wide range of disorders.', icon: '🩸' },
+  { id: 2, name: 'Sonography Test', description: 'High-resolution ultrasound imaging for internal organ screening.', icon: '🩺' },
+  { id: 3, name: 'Kidney Test', description: 'Evaluates how well your kidneys are filtering waste from your blood.', icon: '🫘' },
+  { id: 4, name: 'Liver Test', description: 'Measures proteins, liver enzymes, and bilirubin in the blood.', icon: '🧪' },
+  { id: 5, name: 'Sugar Test', description: 'Measures blood glucose levels to screen for and monitor diabetes.', icon: '📏' },
+  { id: 6, name: 'Vitamin Test', description: 'Checks for essential vitamin deficiencies affecting bone and nerve health.', icon: '☀️' },
+  { id: 7, name: 'Urine Test', description: 'Routine analysis to detect urinary tract infections and kidney issues.', icon: '💧' }
+];
+
 function ManageTestsPage() {
   const navigate = useNavigate()
   
@@ -120,7 +131,6 @@ function ManageTestsPage() {
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || result.message || 'Failed to update test')
 
-      // FIX: Check if backend sent an array or an object, and extract the object safely
       const updatedTest = Array.isArray(result.test) ? result.test[0] : result.test;
 
       setTests(prev => prev.map(t => t.test_id === editModalData.test_id ? updatedTest : t))
@@ -158,7 +168,6 @@ function ManageTestsPage() {
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || result.message || 'Failed to add test')
 
-      // FIX: Check if backend sent an array or an object, and extract the object safely
       const newTest = Array.isArray(result.test) ? result.test[0] : result.test;
 
       setTests(prev => [...prev, newTest])
@@ -262,13 +271,25 @@ function ManageTestsPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Test Name</label>
-                  <input 
-                    type="text" 
+                  <select 
                     value={addForm.test_name} 
-                    onChange={(e) => setAddForm({...addForm, test_name: e.target.value})}
+                    onChange={(e) => {
+                      const selectedTest = popularTests.find(t => t.name === e.target.value);
+                      setAddForm({
+                        ...addForm, 
+                        test_name: e.target.value,
+                        // Auto-fill description if available
+                        description: selectedTest ? selectedTest.description : addForm.description
+                      })
+                    }}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  >
+                    <option value="" disabled>Select a test...</option>
+                    {popularTests.map(test => (
+                      <option key={test.id} value={test.name}>{test.icon} {test.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹)</label>
@@ -333,13 +354,17 @@ function ManageTestsPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Test Name</label>
-                  <input 
-                    type="text" 
+                  <select 
                     value={editModalData.test_name} 
                     onChange={(e) => setEditModalData({...editModalData, test_name: e.target.value})}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  >
+                    <option value="" disabled>Select a test...</option>
+                    {popularTests.map(test => (
+                      <option key={test.id} value={test.name}>{test.icon} {test.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -399,6 +424,7 @@ function ManageTestsPage() {
             </div>
             <button 
               onClick={() => {
+                setAddForm({ test_name: '', price: '', description: '' })
                 setAddModalOpen(true)
                 setFormError('')
               }}
