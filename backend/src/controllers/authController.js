@@ -10,7 +10,7 @@ const { blacklistToken } = require("../services/redisClient");
 const generateAccessToken = (id, userType) => {
   return jwt.sign(
     { id, userType },
-    process.env.JWT_SECRET || "super_secret_access_key",
+    process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN },
   );
 };
@@ -18,16 +18,17 @@ const generateAccessToken = (id, userType) => {
 const generateRefreshToken = (id, userType) => {
   return jwt.sign(
     { id, userType },
-    process.env.JWT_REFRESH_SECRET || "super_secret_refresh_key",
+    process.env.JWT_REFRESH_SECRET,
     { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN },
   );
 };
 
 const sendRefreshTokenCookie = (res, token) => {
+  const isProduction=process.env.NODE_ENV==='production';
   res.cookie("refreshToken", token, {
     httpOnly: true,
-    // secure: false,
-    // sameSite: process.env.NODE_ENV==='production'?'strict':'lax',
+    secure: isProduction,
+    sameSite: isProduction?'strict':'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 };

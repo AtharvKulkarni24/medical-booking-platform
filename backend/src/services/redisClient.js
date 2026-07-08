@@ -4,34 +4,61 @@ let client = null;
 const fallbackBlacklist = new Map();
 
 const initRedis = async () => {
+  if (client && client.isOpen) {
+    return client;
+  }
+
   try {
     client = redis.createClient({
+      url: process.env.REDIS_URL || "redis://localhost:6379",
       socket: {
-        host: process.env.REDIS_HOST || "localhost",
-        port: process.env.REDIS_PORT || 6379,
+        reconnectStrategy: (retries) => {
+          console.log(
+            `[Redis] Attempting to reconnect... (Attempt ${retries})`,
+          );
+
+          if (retries > 20) {
+            console.error(
+              "[Redis] Max reconnection attempts reached. Giving up.",
+            );
+            return new Error("Redis connection lost permanently.");
+          }
+
+          return 2000;
+        },
       },
-      password: process.env.REDIS_PASSWORD || undefined,
     });
 
-    client.on("error", (err) => console.log("Redis Client Error", err));
-    client.on("connect", () => console.log("Redis Client Connected"));
+    client.on("error", (err) => {
+      console.error("[Redis] Error:", err.message);
+    });
+
+    client.on("connect", () => {
+      console.log("[Redis] Connection established.");
+    });
+
+    client.on("reconnecting", () => {
+      console.log("[Redis] Reconnecting...");
+    });
 
     await client.connect();
     return client;
   } catch (error) {
-    console.warn("Redis unavailable, falling back to in-memory blacklist:", error?.message || error);
+    console.warn(
+      "[Redis] Redis unavailable, using in-memory fallback:",
+      error?.message || error,
+    );
     client = null;
     return null;
   }
 };
 
-const redisAvailable = () => client && client.isOpen;
+const redisAvailable = () => Boolean(client && client.isOpen);
 
 const cleanupFallback = () => {
   const now = Date.now();
   for (const [token, data] of fallbackBlacklist.entries()) {
-    // Determine if it's a simple timestamp (blacklist) or an object (refresh token)
-    const expiresAt = typeof data === 'object' ? data.expiresAt : data;
+    const expiresAt = typeof data === "object" ? data.expiresAt : data;
     if (expiresAt <= now) {
       fallbackBlacklist.delete(token);
     }
@@ -66,7 +93,7 @@ const isTokenBlacklisted = async (token) => {
     return fallbackBlacklist.has(token);
   } catch (error) {
     console.error("Error checking token blacklist:", error);
-    return false; 
+    return false;
   }
 };
 
@@ -77,9 +104,11 @@ const storeRefreshToken = async (userId, refreshToken) => {
       return;
     }
 
-    // FIX: Store as an object
     const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
-    fallbackBlacklist.set(`refresh:${userId}`, { token: refreshToken, expiresAt });
+    fallbackBlacklist.set(`refresh:${userId}`, {
+      token: refreshToken,
+      expiresAt,
+    });
   } catch (error) {
     console.error("Error storing refresh token:", error);
     throw error;
@@ -94,8 +123,7 @@ const getRefreshToken = async (userId) => {
 
     cleanupFallback();
     const data = fallbackBlacklist.get(`refresh:${userId}`);
-    
-    // FIX: Retrieve token from object
+
     if (data && data.expiresAt > Date.now()) {
       return data.token;
     }
