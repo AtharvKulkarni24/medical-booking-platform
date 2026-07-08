@@ -1,13 +1,15 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
-//Create a new pool using the credentials from the .env file
+// Create a new pool using the Render connection string
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  // Optional: helps manage dropped connections faster
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 });
 
 // A quick test to ensure the pool connects automatically when the server starts
@@ -15,9 +17,10 @@ pool.on("connect", () => {
   console.log("Connected to the PostgreSQL Database");
 });
 
+// Catch idle connection errors gracefully
 pool.on("error", (err) => {
   console.error("Unexpected error on idle client", err);
-  process.exit(-1);
+  // REMOVED: process.exit(-1); 
 });
 
 module.exports = pool;

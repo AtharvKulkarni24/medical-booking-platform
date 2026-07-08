@@ -1,28 +1,32 @@
 const jwt = require("jsonwebtoken");
 const { isTokenBlacklisted } = require("../services/redisClient");
-const express = require("express");
-
-const app = express();
-
-app.use(express.json()); // Parse JSON bodies
 
 const authenticateToken = async (req, res, next) => {
   try {
-    const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1];
+    const authHeader = req.headers["authorization"] || req.headers["Authorization"];
+    
+    if (!authHeader || typeof authHeader !== 'string') {
+      return res.status(401).json({ success: false, error: "Access token is missing or malformed" });
+    }
 
-    if (!token) {
-      return res.status(401).json({ error: "Token required" });
+    // FIX: Properly extract the token string
+    const token = authHeader.split(" ")[1];
+
+    if (!token || typeof token !== 'string' || token === 'null' || token === 'undefined') {
+      return res.status(401).json({ success: false, error: "Invalid token format in header" });
     }
 
     const blacklisted = await isTokenBlacklisted(token);
     if (blacklisted) {
-      return res.status(401).json({ error: "Token revoked" });
+      return res.status(401).json({ success: false, error: "Token has been revoked. Please log in again." });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    const secret = process.env.JWT_SECRET || 'super_secret_access_key';
+
+    jwt.verify(token, secret, (err, decoded) => {
       if (err) {
-        return res.status(403).json({ error: "Invalid token" });
+        console.error("JWT Verification Failed:", err.message);
+        return res.status(403).json({ success: false, error: "Invalid or expired access token" });
       }
 
       req.user = decoded;
@@ -30,7 +34,8 @@ const authenticateToken = async (req, res, next) => {
     });
 
   } catch (err) {
-    res.status(500).json({ error: "Auth error" });
+    console.error("Middleware Auth Error:", err);
+    res.status(500).json({ success: false, error: "Internal server authentication error" });
   }
 };
 
