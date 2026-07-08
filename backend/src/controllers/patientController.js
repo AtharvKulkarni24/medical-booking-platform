@@ -123,3 +123,66 @@ exports.updatePatientPassword = async (req, res) => {
     res.status(500).json({ success: false, error: "Server error during password update." });
   }
 };
+// ==========================================
+// GET COMPLETED APPOINTMENTS (FOR REVIEWS)
+// ==========================================
+exports.getCompletedAppointments = async (req, res) => {
+  try {
+    const patientId = req.user.id; // Comes from authenticateToken middleware
+
+    // We use "appointment_id as id" so it perfectly matches your React frontend
+    const result = await db.query(
+      `SELECT 
+        a.appointment_id AS id, 
+        a.appointment_date, 
+        s.start_time,
+        s.end_time,
+        a.status,
+        l.name AS lab_name,
+        t.test_name AS test_name
+      FROM appointments a
+      JOIN labs l ON a.lab_id = l.lab_id
+      JOIN time_slots s ON a.slot_id=s.slot_id
+      JOIN tests t ON a.test_id = t.test_id
+      WHERE a.patient_id = $1 AND a.status = 'COMPLETED'
+      ORDER BY a.appointment_date DESC`,
+      [patientId]
+    );
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Error fetching completed appointments:", error);
+    res.status(500).json({ success: false, error: "Server error fetching appointments." });
+  }
+};
+
+// ==========================================
+// GET PAST REVIEWS
+// ==========================================
+exports.getPastReviews = async (req, res) => {
+  try {
+    const patientId = req.user.id;
+
+    const result = await db.query(
+      `SELECT 
+        r.review_id, 
+        r.appointment_id, 
+        r.rating, 
+        r.comment, 
+        r.created_at,
+        l.name AS lab_name,
+        t.test_name AS test_name
+      FROM reviews r
+      JOIN labs l ON r.lab_id = l.lab_id
+      JOIN appointments a ON r.appointment_id = a.appointment_id
+      JOIN tests t ON a.test_id = t.test_id
+      WHERE r.patient_id = $1
+      ORDER BY r.created_at DESC`,
+      [patientId]
+    );
+
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Error fetching past reviews:", error);
+    res.status(500).json({ success: false, error: "Server error fetching reviews." });
+  }
+};

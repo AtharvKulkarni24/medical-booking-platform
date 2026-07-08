@@ -11,5 +11,14 @@ router.use(authorizeRole('patient'));
 router.get('/profile', patientController.getPatientProfile);
 router.patch('/profile', patientController.updatePatientProfile);
 router.patch('/profile/password', patientController.updatePatientPassword);
+router.get(
+  "/appointments/completed",  
+  patientController.getCompletedAppointments
+);
+
+router.get(
+  "/reviews/past", 
+  patientController.getPastReviews
+);
 
 module.exports = router;

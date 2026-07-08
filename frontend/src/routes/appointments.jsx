@@ -56,12 +56,17 @@ function MyAppointmentsPage() {
   // 2. Check if an appointment is in the past (Date + Time check)
   const canBeCancelled = (dateStr, timeStr) => {
     const now = new Date()
-    // Create a Date object combining the appointment date and start time
-    // format: YYYY-MM-DDTHH:MM:SS
     const appointmentDateTime = new Date(`${dateStr}T${timeStr}`)
-    
-    // You can only cancel if the appointment is in the future
     return appointmentDateTime > now
+  }
+
+  // NEW: Check if an appointment was missed (Time passed, but not completed or cancelled)
+  const isMissedAppointment = (dateStr, timeStr, status) => {
+    if (status === 'COMPLETED' || status === 'CANCELLED') return false;
+    
+    const now = new Date()
+    const appointmentDateTime = new Date(`${dateStr}T${timeStr}`)
+    return appointmentDateTime < now
   }
 
   // 3. Confirm and Execute Cancellation
@@ -230,54 +235,68 @@ function MyAppointmentsPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {currentList.map((app) => (
-              <div key={app.appointment_id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col md:flex-row gap-6 justify-between hover:shadow-md transition">
-                
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    {getStatusBadge(app.status)}
-                    <span className="text-sm font-medium text-gray-500 font-mono">ID: {app.appointment_id}</span>
-                  </div>
+            {currentList.map((app) => {
+              // Check if this specific appointment is missed
+              const isMissed = activeTab === 'past' && isMissedAppointment(app.appointment_date, app.start_time, app.status);
+
+              return (
+                <div key={app.appointment_id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition">
                   
-                  <h3 className="text-xl font-bold text-gray-900 mb-1">{app.test_name}</h3>
-                  <p className="text-gray-600 font-medium">{app.lab_name}</p>
-                  <p className="text-sm text-gray-500 mt-1 flex items-start gap-1">
-                    <span>📍</span> {app.address_text}
-                  </p>
-                </div>
+                  {/* MISSED APPOINTMENT HEADER */}
+                  {isMissed && (
+                    <div className="bg-red-50 text-red-700 px-6 py-3 text-sm font-bold border-b border-red-100 flex items-center gap-2">
+                      <span className="text-lg">⚠️</span> You did not visit the lab for this appointment.
+                    </div>
+                  )}
 
-                <div className="flex flex-col md:items-end justify-between md:pl-6 md:border-l border-gray-100 min-w-[200px]">
-                  <div className="mb-4 md:mb-0 md:text-right">
-                    <p className="text-sm text-gray-500 uppercase font-bold tracking-wider mb-1">Appointment Time</p>
-                    <p className="font-bold text-gray-900">{formatDateLabel(app.appointment_date)}</p>
-                    <p className="text-blue-600 font-bold">{formatTime(app.start_time)}</p>
+                  <div className="p-6 flex flex-col md:flex-row gap-6 justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        {getStatusBadge(app.status)}
+                        <span className="text-sm font-medium text-gray-500 font-mono">ID: {app.appointment_id}</span>
+                      </div>
+                      
+                      <h3 className="text-xl font-bold text-gray-900 mb-1">{app.test_name}</h3>
+                      <p className="text-gray-600 font-medium">{app.lab_name}</p>
+                      <p className="text-sm text-gray-500 mt-1 flex items-start gap-1">
+                        <span>📍</span> {app.address_text}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col md:items-end justify-between md:pl-6 md:border-l border-gray-100 min-w-[200px]">
+                      <div className="mb-4 md:mb-0 md:text-right">
+                        <p className="text-sm text-gray-500 uppercase font-bold tracking-wider mb-1">Appointment Time</p>
+                        <p className="font-bold text-gray-900">{formatDateLabel(app.appointment_date)}</p>
+                        <p className="text-blue-600 font-bold">{formatTime(app.start_time)}</p>
+                      </div>
+
+                      <div className="mt-4 w-full">
+                        {/* ONLY SHOW CANCEL BUTTON IF IT HAS NOT STARTED YET */}
+                        {app.status === 'CONFIRMED' && activeTab === 'upcoming' && canBeCancelled(app.appointment_date, app.start_time) && (
+                          <button 
+                            onClick={() => setCancelModalData(app)}
+                            className="w-full py-2.5 px-4 rounded-xl font-medium transition-all bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 hover:border-red-200"
+                          >
+                            Cancel Appointment
+                          </button>
+                        )}
+
+                        {app.status === 'COMPLETED' && app.report_url && (
+                          <a 
+                            href={app.report_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block w-full text-center bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 font-medium py-2.5 px-4 rounded-xl transition-all"
+                          >
+                            📄 View Report
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="mt-4 w-full">
-                    {/* ONLY SHOW CANCEL BUTTON IF IT HAS NOT STARTED YET */}
-                    {app.status === 'CONFIRMED' && activeTab === 'upcoming' && canBeCancelled(app.appointment_date, app.start_time) && (
-                      <button 
-                        onClick={() => setCancelModalData(app)}
-                        className="w-full py-2.5 px-4 rounded-xl font-medium transition-all bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 hover:border-red-200"
-                      >
-                        Cancel Appointment
-                      </button>
-                    )}
-
-                    {app.status === 'COMPLETED' && app.report_url && (
-                      <a 
-                        href={app.report_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block w-full text-center bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 font-medium py-2.5 px-4 rounded-xl transition-all"
-                      >
-                        📄 View Report
-                      </a>
-                    )}
-                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
