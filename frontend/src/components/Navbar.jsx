@@ -29,6 +29,9 @@ export default function Navbar() {
     navigate({ to: '/login' }) 
   }
 
+  // Fallback check to safely grab the ID whether it's stored as .id or .lab_id
+  const labId = user?.id || user?.lab_id;
+
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 max-w-7xl">
@@ -49,13 +52,12 @@ export default function Navbar() {
               {/* CONDITIONALLY RENDERED: Hidden if the user is a lab */}
               {user?.role !== 'lab' && (
                 <Link
-  to="/search/labs"
-  className="relative inline-flex items-center justify-center px-6 py-2.5 rounded-lg font-semibold text-white overflow-hidden group bg-gradient-to-r from-cyan-500 to-blue-900 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/30"
->
-  <span className="absolute inset-0 bg-linear-to-r from-blue-900 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></span>
-
-  <span className="relative z-10">Find a Lab</span>
-</Link>
+                  to="/search/labs"
+                  className="relative inline-flex items-center justify-center px-6 py-2.5 rounded-lg font-semibold text-white overflow-hidden group bg-gradient-to-r from-cyan-500 to-blue-900 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/30"
+                >
+                  <span className="absolute inset-0 bg-linear-to-r from-blue-900 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></span>
+                  <span className="relative z-10">Find a Lab</span>
+                </Link>
               )}
             </div>
           </div>
@@ -140,8 +142,15 @@ export default function Navbar() {
                             onClick={() => setIsDropdownOpen(false)}
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
                           >
-                            
                             My Dashboard
+                          </Link>
+                          {/* CORRECTED LINK HERE */}
+                          <Link
+                            to={`/labs/${labId}/appointments`}
+                            onClick={() => setIsDropdownOpen(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                          >
+                            My Appointments
                           </Link>
                           <Link
                             to="/labs/tests"

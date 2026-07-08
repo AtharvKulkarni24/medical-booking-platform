@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import TestCard from '../components/TestCard'
 import Footer from '../components/Footer'
+import { useAuth } from '../context/AuthContext' // Make sure this path is correct
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -20,9 +21,22 @@ const popularTests = [
 
 function HomePage() {
   const navigate = useNavigate();
+  
+  // 1. Pull user and loading state from AuthContext
+  const { user, loading: authLoading } = useAuth();
+  
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
   const [activeTest, setActiveTest] = useState('');
+
+  // 2. Security Redirect: Send labs to their dashboard
+  useEffect(() => {
+    if (!authLoading) {
+      if (user && user.role === 'lab') {
+        navigate({ to: '/labs', replace: true });
+      }
+    }
+  }, [user, authLoading, navigate]);
 
   const handleTestClick = (testName) => {
     setLocationError('');
@@ -55,6 +69,15 @@ function HomePage() {
         setIsLocating(false);
       }
     );
+  }
+
+  // 3. Show a loading spinner while checking authentication so the UI doesn't flash
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+      </div>
+    )
   }
 
   return (

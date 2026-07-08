@@ -25,6 +25,7 @@ import { Route as LabsTestsRouteImport } from './routes/labs_.tests'
 import { Route as LabsSlotsRouteImport } from './routes/labs_.slots'
 import { Route as LabsReviewsRouteImport } from './routes/labs_.reviews'
 import { Route as SearchLabsLab_idRouteImport } from './routes/search_.labs_.$lab_id'
+import { Route as LabsLab_idAppointmentsRouteImport } from './routes/labs_.$lab_id_.appointments'
 import { Route as SearchLabsLab_idTestsTest_idRouteImport } from './routes/search_.labs_.$lab_id_.tests.$test_id'
 
 const TermsRoute = TermsRouteImport.update({
@@ -107,6 +108,11 @@ const SearchLabsLab_idRoute = SearchLabsLab_idRouteImport.update({
   path: '/search/labs/$lab_id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LabsLab_idAppointmentsRoute = LabsLab_idAppointmentsRouteImport.update({
+  id: '/labs_/$lab_id_/appointments',
+  path: '/labs/$lab_id/appointments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SearchLabsLab_idTestsTest_idRoute =
   SearchLabsLab_idTestsTest_idRouteImport.update({
     id: '/search_/labs_/$lab_id_/tests/$test_id',
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/labs/slots': typeof LabsSlotsRoute
   '/labs/tests': typeof LabsTestsRoute
   '/search/labs': typeof SearchLabsRoute
+  '/labs/$lab_id/appointments': typeof LabsLab_idAppointmentsRoute
   '/search/labs/$lab_id': typeof SearchLabsLab_idRoute
   '/search/labs/$lab_id/tests/$test_id': typeof SearchLabsLab_idTestsTest_idRoute
 }
@@ -149,6 +156,7 @@ export interface FileRoutesByTo {
   '/labs/slots': typeof LabsSlotsRoute
   '/labs/tests': typeof LabsTestsRoute
   '/search/labs': typeof SearchLabsRoute
+  '/labs/$lab_id/appointments': typeof LabsLab_idAppointmentsRoute
   '/search/labs/$lab_id': typeof SearchLabsLab_idRoute
   '/search/labs/$lab_id/tests/$test_id': typeof SearchLabsLab_idTestsTest_idRoute
 }
@@ -169,6 +177,7 @@ export interface FileRoutesById {
   '/labs_/slots': typeof LabsSlotsRoute
   '/labs_/tests': typeof LabsTestsRoute
   '/search_/labs': typeof SearchLabsRoute
+  '/labs_/$lab_id_/appointments': typeof LabsLab_idAppointmentsRoute
   '/search_/labs_/$lab_id': typeof SearchLabsLab_idRoute
   '/search_/labs_/$lab_id_/tests/$test_id': typeof SearchLabsLab_idTestsTest_idRoute
 }
@@ -190,6 +199,7 @@ export interface FileRouteTypes {
     | '/labs/slots'
     | '/labs/tests'
     | '/search/labs'
+    | '/labs/$lab_id/appointments'
     | '/search/labs/$lab_id'
     | '/search/labs/$lab_id/tests/$test_id'
   fileRoutesByTo: FileRoutesByTo
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/labs/slots'
     | '/labs/tests'
     | '/search/labs'
+    | '/labs/$lab_id/appointments'
     | '/search/labs/$lab_id'
     | '/search/labs/$lab_id/tests/$test_id'
   id:
@@ -228,6 +239,7 @@ export interface FileRouteTypes {
     | '/labs_/slots'
     | '/labs_/tests'
     | '/search_/labs'
+    | '/labs_/$lab_id_/appointments'
     | '/search_/labs_/$lab_id'
     | '/search_/labs_/$lab_id_/tests/$test_id'
   fileRoutesById: FileRoutesById
@@ -248,6 +260,7 @@ export interface RootRouteChildren {
   LabsSlotsRoute: typeof LabsSlotsRoute
   LabsTestsRoute: typeof LabsTestsRoute
   SearchLabsRoute: typeof SearchLabsRoute
+  LabsLab_idAppointmentsRoute: typeof LabsLab_idAppointmentsRoute
   SearchLabsLab_idRoute: typeof SearchLabsLab_idRoute
   SearchLabsLab_idTestsTest_idRoute: typeof SearchLabsLab_idTestsTest_idRoute
 }
@@ -366,6 +379,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SearchLabsLab_idRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/labs_/$lab_id_/appointments': {
+      id: '/labs_/$lab_id_/appointments'
+      path: '/labs/$lab_id/appointments'
+      fullPath: '/labs/$lab_id/appointments'
+      preLoaderRoute: typeof LabsLab_idAppointmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/search_/labs_/$lab_id_/tests/$test_id': {
       id: '/search_/labs_/$lab_id_/tests/$test_id'
       path: '/search/labs/$lab_id/tests/$test_id'
@@ -392,6 +412,7 @@ const rootRouteChildren: RootRouteChildren = {
   LabsSlotsRoute: LabsSlotsRoute,
   LabsTestsRoute: LabsTestsRoute,
   SearchLabsRoute: SearchLabsRoute,
+  LabsLab_idAppointmentsRoute: LabsLab_idAppointmentsRoute,
   SearchLabsLab_idRoute: SearchLabsLab_idRoute,
   SearchLabsLab_idTestsTest_idRoute: SearchLabsLab_idTestsTest_idRoute,
 }

@@ -483,3 +483,158 @@ exports.deleteSlot = async (req, res) => {
     return res.status(500).json({ success: false, error: "Internal server error while deleting slot." });
   }
 };
+// ==========================================
+// 1. GET LAB APPOINTMENTS (Organized by tabs)
+// ==========================================
+exports.getLabAppointments = async (req, res) => {
+  try {
+    const { lab_id } = req.params;
+
+    // Grab the ID and Role based on your JWT payload
+    const loggedInLabId = req.user.id || req.user.lab_id;
+    const role = req.user.userType || req.user.role; 
+
+    // Security Check
+    if (role !== 'lab' || String(loggedInLabId) !== String(lab_id)) {
+      return res.status(403).json({ error: "Unauthorized access to lab schedule." });
+    }
+
+    // BASE QUERY perfectly matching your schema joins
+    const baseQuery = `
+      SELECT 
+        a.appointment_id AS id, 
+        TO_CHAR(a.appointment_date, 'YYYY-MM-DD') AS appointment_date, 
+        a.status, 
+        a.report_url,
+        s.start_time,
+        t.test_name, 
+        p.name AS patient_name, 
+        p.phone_number AS patient_phone, 
+        p.email AS patient_email
+      FROM appointments a
+      JOIN tests t ON a.test_id = t.test_id
+      JOIN patients p ON a.patient_id = p.patient_id
+      JOIN time_slots s ON a.slot_id = s.slot_id
+      WHERE a.lab_id = $1
+    `;
+
+    // 1. TODAY'S Appointments
+    const todayQuery = await db.query(
+      `${baseQuery} AND a.appointment_date = CURRENT_DATE 
+       ORDER BY s.start_time ASC`,
+      [lab_id]
+    );
+
+    // 2. UPCOMING Appointments (Next 6 Days)
+    const upcomingQuery = await db.query(
+      `${baseQuery} AND a.appointment_date > CURRENT_DATE AND a.appointment_date <= (CURRENT_DATE + INTERVAL '6 days')
+       ORDER BY a.appointment_date ASC, s.start_time ASC`,
+      [lab_id]
+    );
+
+    // 3. PAST Appointments (Last 30 Days)
+    const pastQuery = await db.query(
+      `${baseQuery} AND a.appointment_date >= (CURRENT_DATE - INTERVAL '30 days') AND a.appointment_date < CURRENT_DATE
+       ORDER BY a.appointment_date DESC, s.start_time DESC`,
+      [lab_id]
+    );
+
+    res.status(200).json({
+      today: todayQuery.rows,
+      upcoming: upcomingQuery.rows,
+      past: pastQuery.rows
+    });
+
+  } catch (error) {
+    console.error("🔥 DATABASE SQL ERROR in getLabAppointments:", error.message);
+    res.status(500).json({ error: "Server error fetching lab schedule." });
+  }
+};
+
+
+// ==========================================
+// 2. COMPLETE APPOINTMENT & ATTACH REPORT
+// ==========================================
+exports.completeAppointment = async (req, res) => {
+  try {
+    const loggedInLabId = req.user.id || req.user.lab_id;
+    const role = req.user.userType || req.user.role; 
+    
+    // This expects the UUID from your appointments table
+    const { id } = req.params; 
+    const { report_url } = req.body;
+
+    // Security Check
+    if (role !== 'lab') {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Unauthorized. Only labs can perform this action." 
+      });
+    }
+
+    // Verify ownership and check if it is today
+    const appCheck = await db.query(
+      `SELECT 
+         status, 
+         (appointment_date = CURRENT_DATE) AS is_today 
+       FROM appointments 
+       WHERE appointment_id = $1 AND lab_id = $2`,
+      [id, loggedInLabId]
+    );
+
+    if (appCheck.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Appointment not found or you are not authorized to modify it.",
+      });
+    }
+
+    const { status: currentStatus, is_today: isToday } = appCheck.rows[0];
+
+    // Business Logic Validation
+    if (currentStatus === "CANCELLED") {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Cannot complete a cancelled appointment." 
+      });
+    }
+
+    if (currentStatus === "COMPLETED" && !report_url) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "This appointment is already marked as completed." 
+      });
+    }
+
+    if (!isToday) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Action Denied: Appointments can only be marked as completed on their exact scheduled date." 
+      });
+    }
+
+    // Update Status and Attach URL using COALESCE
+    const updatedAppointment = await db.query(
+      `UPDATE appointments 
+       SET 
+         status = 'COMPLETED',
+         report_url = COALESCE($1, report_url)
+       WHERE appointment_id = $2 
+       RETURNING appointment_id, status, report_url`,
+      [report_url || null, id]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Appointment marked as completed successfully.",
+      appointment: updatedAppointment.rows[0],
+    });
+
+  } catch (error) {
+    console.error("🔥 Complete Appointment Error:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Server error while completing appointment.",
+    });
+  }
+};
