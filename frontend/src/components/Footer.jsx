@@ -1,37 +1,56 @@
-import { Link } from '@tanstack/react-router'
+import { Link } from 'react-router-dom'
 
 export default function Footer() {
   return (
-    <footer className="w-full bg-gray-800 text-white pt-12 pb-8 mt-auto">
-      <div className="container mx-auto px-4 max-w-7xl">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-          <div>
-            <h2 className="text-xl font-bold mb-4">MedBook</h2>
-            <p className="text-gray-400 text-sm">
-              Your trusted platform for booking diagnostic tests with certified laboratories in your area. Fast, accurate, and reliable.
+    <footer className="w-full bg-slate-900 text-slate-300 pt-12 pb-8 border-t border-slate-800 mt-auto">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+          
+          {/* COL 1: BRAND SUMMARY */}
+          <div className="space-y-3">
+            <Link to="/" className="text-2xl font-extrabold tracking-tight block">
+              <span className="text-blue-500">Med</span>
+              <span className="text-white">Book</span>
+            </Link>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Medical diagnostic booking platform. Search, compare, and book certified laboratories with instant digital reports.
             </p>
           </div>
+
+          {/* COL 2: PATIENT QUICK LINKS */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-            <ul className="space-y-2 text-sm text-gray-400">
+            <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-100 mb-3">Patients</h3>
+            <ul className="space-y-2 text-xs font-medium text-slate-400">
               <li><Link to="/" className="hover:text-white transition">Home</Link></li>
-              <li><Link to="/login" className="hover:text-white transition">Patient Login</Link></li>
-              <li><Link to="/login" className="hover:text-white transition">Lab Partner Login</Link></li>
-              <li><Link to="/" className="hover:text-white transition">Contact Us</Link></li>
+              <li><Link to="/search/labs" className="hover:text-white transition">Find Diagnostic Labs</Link></li>
+              <li><Link to="/appointments" className="hover:text-white transition">My Appointments</Link></li>
             </ul>
           </div>
+
+          {/* COL 3: DIAGNOSTIC PARTNERS */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Legal</h3>
-            <ul className="space-y-2 text-sm text-gray-400">
+            <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-100 mb-3">Partner Portal</h3>
+            <ul className="space-y-2 text-xs font-medium text-slate-400">
+              <li><Link to="/login" className="hover:text-white transition">Partner Sign In</Link></li>
+              <li><Link to="/register" className="hover:text-white transition">Register Diagnostic Center</Link></li>
+            </ul>
+          </div>
+
+          {/* COL 4: LEGAL & POLICIES */}
+          <div>
+            <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-100 mb-3">Legal Policies</h3>
+            <ul className="space-y-2 text-xs font-medium text-slate-400">
               <li><Link to="/privacy" className="hover:text-white transition">Privacy Policy</Link></li>
               <li><Link to="/terms" className="hover:text-white transition">Terms of Service</Link></li>
-              <li><Link to="/refund" className="hover:text-white transition">Refund Policy</Link></li>
+              <li><Link to="/refund" className="hover:text-white transition">Cancellation & Refund Policy</Link></li>
             </ul>
           </div>
+
         </div>
-        
-        <div className="border-t border-gray-700 pt-8 text-center text-sm text-gray-500">
-          &copy; {new Date().getFullYear()} MedBook. All rights reserved.
+
+        <div className="border-t border-slate-800/80 pt-6 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-3">
+          <p>&copy; {new Date().getFullYear()} MedBook Platform. All rights reserved.</p>
+          <p>Reliable healthcare diagnostics.</p>
         </div>
       </div>
     </footer>

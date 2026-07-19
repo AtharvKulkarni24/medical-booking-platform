@@ -4,7 +4,6 @@ const jwt = require("jsonwebtoken");
 const { blacklistToken, revokeRefreshToken } = require("../services/redisClient");
 
 // --- GET PATIENT PROFILE ---
-// --- GET PATIENT PROFILE ---
 exports.getPatientProfile = async (req, res) => {
   try {
     const patientId = req.user.id;

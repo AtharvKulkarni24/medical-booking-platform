@@ -24,8 +24,15 @@ router.get("/slots/:id", labController.getSlotById);
 router.put("/slots/:id", labController.updateSlot);
 router.delete("/slots/:id", labController.deleteSlot);
 
-//lab appointments
-router.get("/:lab_id/appointments",labController.getLabAppointments);
+// Tests management
+router.post("/tests", labController.createTest);
+router.get("/tests", labController.getAllTests);
+router.get("/tests/:id", labController.getTestById);
+router.put("/tests/:id", labController.updateTest);
+router.delete("/tests/:id", labController.deleteTest);
+
+// Lab appointments
+router.get("/:lab_id/appointments", labController.getLabAppointments);
 router.patch(
   '/appointments/:id/complete', 
   labController.completeAppointment

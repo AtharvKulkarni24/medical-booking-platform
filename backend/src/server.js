@@ -12,7 +12,6 @@ const authRoutes = require("./routes/authRoutes");
 const patientRoutes = require("./routes/patientRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 const labRoutes = require("./routes/labRoutes");
-const testRoutes = require("./routes/testRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 
@@ -36,7 +35,6 @@ app.use("/api", authRoutes);
 app.use("/api/patients", patientRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/labs", labRoutes);
-app.use("/api/labs/tests", testRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/reviews", reviewRoutes);
 

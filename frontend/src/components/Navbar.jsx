@@ -1,18 +1,15 @@
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import logo from '../assets/MedBook_logo.png'
 
 export default function Navbar() {
   const navigate = useNavigate()
-  
-  // Pull the global user state and logout function from AuthContext
   const { user, logout } = useAuth()
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
 
-  // Listen for clicks outside the dropdown to close it automatically
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -26,173 +23,173 @@ export default function Navbar() {
   const handleLogout = async () => {
     await logout() 
     setIsDropdownOpen(false)
-    navigate({ to: '/login' }) 
+    navigate('/login')
   }
 
-  // Fallback check to safely grab the ID whether it's stored as .id or .lab_id
   const labId = user?.id || user?.lab_id;
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
-      <div className="container mx-auto px-4 max-w-7xl">
-        <div className="flex justify-between items-center h-16">
+    <header className="glass-nav sticky top-0 z-50 transition-all duration-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-20">
           
-          {/* Left Side: Logo and Navigation */}
+          {/* LEFT: BRAND LOGO & NAV */}
           <div className="flex items-center gap-8">
-            {/* DYNAMIC LOGO LINK */}
             <Link 
               to={user?.role === 'lab' ? '/labs' : '/'} 
-              className="flex items-center gap-2"
+              className="flex items-center gap-3 group"
             >
-              <img src={logo} alt="MedBook Logo" className="h-24 w-auto" />
-              <span className="text-2xl font-bold "> <span className="text-cyan-500">Med</span><span className="text-blue-900">Book</span></span>
+              <img src={logo} alt="MedBook Logo" className="h-12 w-auto group-hover:scale-105 transition duration-200" />
+              <span className="text-2xl font-extrabold tracking-tight">
+                <span className="text-blue-600">Med</span>
+                <span className="text-slate-900">Book</span>
+              </span>
             </Link>
             
-            <div className="hidden md:flex gap-4">
-              {/* CONDITIONALLY RENDERED: Hidden if the user is a lab */}
+            <div className="hidden md:flex items-center gap-2">
               {user?.role !== 'lab' && (
                 <Link
                   to="/search/labs"
-                  className="relative inline-flex items-center justify-center px-6 py-2.5 rounded-lg font-semibold text-white overflow-hidden group bg-gradient-to-r from-cyan-500 to-blue-900 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/30"
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-slate-700 hover:text-blue-600 hover:bg-blue-50/80 transition"
                 >
-                  <span className="absolute inset-0 bg-linear-to-r from-blue-900 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></span>
-                  <span className="relative z-10">Find a Lab</span>
+                  Find Labs
                 </Link>
               )}
             </div>
           </div>
 
-          {/* Right Side: Auth / Profile */}
+          {/* RIGHT: AUTH & USER DROPDOWN */}
           <div className="flex items-center gap-4">
-            
             {!user ? (
-              /* --- LOGGED OUT STATE --- */
-              <>
+              <div className="flex items-center gap-3">
                 <Link 
                   to="/login" 
-                  className="text-blue-600 font-medium px-4 py-2 hover:bg-blue-50 rounded-md transition"
+                  className="text-slate-700 hover:text-blue-600 font-bold text-sm px-4 py-2 rounded-xl hover:bg-slate-100 transition"
                 >
                   Log in
                 </Link>
                 <Link 
                   to="/register" 
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md transition shadow-sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-md transition duration-200"
                 >
                   Sign Up
                 </Link>
-              </>
+              </div>
             ) : (
-              /* --- LOGGED IN STATE (Dropdown) --- */
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-4 py-2 rounded-lg transition"
+                  className="flex items-center gap-3 bg-white hover:bg-slate-50 border border-slate-200/90 px-4 py-2 rounded-2xl transition shadow-sm cursor-pointer"
                 >
-                  <div className="w-7 h-7 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
+                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-extrabold text-sm shadow-sm">
                     {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
                   </div>
-                  <span className="text-sm font-medium text-gray-700">
-                    {user.name || 'My Account'}
-                  </span>
-                  {/* Dropdown Arrow Icon */}
-                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  <div className="text-left hidden sm:block">
+                    <span className="text-xs font-bold text-slate-900 block leading-tight">
+                      {user.name || 'Account'}
+                    </span>
+                    <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider block">
+                      {user.role === 'lab' ? 'Lab Partner' : 'Patient'}
+                    </span>
+                  </div>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
 
-                {/* Dropdown Menu */}
+                {/* DROPDOWN MENU */}
                 {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 overflow-hidden z-50">
+                  <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-xl border border-slate-200/90 overflow-hidden z-50 animate-fade-in-up">
+                    <div className="p-3 border-b border-slate-100 bg-slate-50/60 sm:hidden">
+                      <span className="text-xs font-bold text-slate-900 block">{user.name}</span>
+                      <span className="text-[10px] font-semibold text-blue-600 uppercase">{user.role}</span>
+                    </div>
+
                     <div className="py-1">
-                      
                       <Link
                         to="/profile"
                         onClick={() => setIsDropdownOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
                       >
-                        My Profile
+                        <span>👤</span> My Profile
                       </Link>
                       
-                      {/* --- PATIENT ONLY LINKS --- */}
                       {user?.role === 'patient' && (
                         <>
-                        <Link 
-                          to="/appointments" 
-                          onClick={() => setIsDropdownOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          My Appointments
-                        </Link>
-
-                        <Link 
-                          to="/reviews" 
-                          onClick={() => setIsDropdownOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          My Reviews
-                        </Link>
+                          <Link 
+                            to="/appointments" 
+                            onClick={() => setIsDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                          >
+                            <span>📅</span> My Appointments
+                          </Link>
+                          <Link 
+                            to="/reviews" 
+                            onClick={() => setIsDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                          >
+                            <span>⭐</span> My Reviews
+                          </Link>
                         </>
                       )}
 
-                      {/* --- LAB ONLY LINKS --- */}
                       {user?.role === 'lab' && (
                         <>
                           <Link
                             to="/labs"
                             onClick={() => setIsDropdownOpen(false)}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
                           >
-                            My Dashboard
+                            <span>📊</span> Lab Dashboard
                           </Link>
-                          {/* CORRECTED LINK HERE */}
                           <Link
                             to={`/labs/${labId}/appointments`}
                             onClick={() => setIsDropdownOpen(false)}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
                           >
-                            My Appointments
+                            <span>📋</span> Daily Roster
                           </Link>
                           <Link
                             to="/labs/tests"
                             onClick={() => setIsDropdownOpen(false)}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
                           >
-                            My Tests
+                            <span>🧪</span> Manage Tests
                           </Link>
                           <Link
                             to="/labs/slots"
                             onClick={() => setIsDropdownOpen(false)}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
                           >
-                            My Slots
+                            <span>🕒</span> Time Slots
                           </Link>
                           <Link
                             to="/labs/reviews"
                             onClick={() => setIsDropdownOpen(false)}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
                           >
-                            My Reviews
+                            <span>⭐</span> Patient Reviews
                           </Link>
                         </>
                       )}
 
-                      <div className="border-t border-gray-100 my-1"></div>
+                      <div className="border-t border-slate-100 my-1"></div>
                       
                       <button
                         onClick={handleLogout}
-                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+                        className="flex items-center gap-2.5 w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 transition cursor-pointer"
                       >
-                        Logout
+                        <span>🚪</span> Log Out
                       </button>
                     </div>
                   </div>
                 )}
               </div>
             )}
-            
           </div>
+
         </div>
       </div>
-    </nav>
+    </header>
   )
 }
