@@ -13,18 +13,13 @@ const initRedis = async () => {
       url: process.env.REDIS_URL || "redis://localhost:6379",
       socket: {
         reconnectStrategy: (retries) => {
-          console.log(
-            `[Redis] Attempting to reconnect... (Attempt ${retries})`,
-          );
-
-          if (retries > 20) {
-            console.error(
-              "[Redis] Max reconnection attempts reached. Giving up.",
+          if (retries > 3) {
+            console.log(
+              "ℹ️ [Redis] Server unavailable. Using in-memory fallback store."
             );
-            return new Error("Redis connection lost permanently.");
+            return false; // Stop reconnecting loop and use in-memory fallback cleanly
           }
-
-          return 2000;
+          return 1000;
         },
       },
     });
