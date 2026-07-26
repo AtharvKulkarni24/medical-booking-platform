@@ -10,13 +10,11 @@ const initRedis = async () => {
 
   try {
     const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-    const isRediss = redisUrl.startsWith("rediss://");
 
     client = redis.createClient({
       url: redisUrl,
+      pingInterval: 30000, // Keeps connection alive every 30s to prevent cloud idle socket timeouts
       socket: {
-        tls: isRediss ? true : undefined,
-        rejectUnauthorized: false,
         reconnectStrategy: (retries) => {
           if (retries > 3) {
             console.log(
@@ -30,7 +28,11 @@ const initRedis = async () => {
     });
 
     client.on("error", (err) => {
-      console.error("[Redis] Error:", err.message);
+      // Silence idle socket closure log notifications from cloud providers
+      if (err?.message && err.message.includes("Socket closed unexpectedly")) {
+        return;
+      }
+      console.error("[Redis] Error:", err?.message || err);
     });
 
     client.on("connect", () => {
