@@ -9,9 +9,14 @@ const initRedis = async () => {
   }
 
   try {
+    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+    const isRediss = redisUrl.startsWith("rediss://");
+
     client = redis.createClient({
-      url: process.env.REDIS_URL || "redis://localhost:6379",
+      url: redisUrl,
       socket: {
+        tls: isRediss ? true : undefined,
+        rejectUnauthorized: false,
         reconnectStrategy: (retries) => {
           if (retries > 3) {
             console.log(
