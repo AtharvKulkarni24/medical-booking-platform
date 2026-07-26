@@ -100,11 +100,11 @@ const isTokenBlacklisted = async (token) => {
 const storeRefreshToken = async (userId, refreshToken) => {
   try {
     if (redisAvailable()) {
-      await client.setEx(`refresh:${userId}`, 7 * 24 * 60 * 60, refreshToken);
+      await client.setEx(`refresh:${userId}`, 1 * 60 * 60, refreshToken);
       return;
     }
 
-    const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    const expiresAt = Date.now() + 1 * 60 * 60 * 1000;
     fallbackBlacklist.set(`refresh:${userId}`, {
       token: refreshToken,
       expiresAt,

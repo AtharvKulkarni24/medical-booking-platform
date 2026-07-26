@@ -33,6 +33,13 @@ CREATE TABLE labs (
     is_verified BOOLEAN DEFAULT FALSE,
     auth_document_url TEXT,
     average_rating DECIMAL(2, 1) DEFAULT 0.0,
+    razorpay_account_id VARCHAR(255),
+    razorpay_account_status VARCHAR(50) DEFAULT 'NOT_LINKED',
+    bank_account_number VARCHAR(50),
+    bank_ifsc VARCHAR(20),
+    bank_account_holder_name VARCHAR(255),
+    business_entity_type VARCHAR(50) DEFAULT 'individual',
+    platform_commission_percentage DECIMAL(5, 2) DEFAULT 10.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -75,6 +82,12 @@ CREATE TABLE payments (
     gateway_provider VARCHAR(100) NOT NULL,
     gateway_order_id VARCHAR(255) NOT NULL,
     gateway_payment_id VARCHAR(255),
+    razorpay_transfer_id VARCHAR(255),
+    platform_fee DECIMAL(10, 2) DEFAULT 0.00,
+    lab_payout_amount DECIMAL(10, 2) DEFAULT 0.00,
+    refund_id VARCHAR(255),
+    refund_status VARCHAR(50) DEFAULT 'NOT_REFUNDED',
+    refund_amount DECIMAL(10, 2) DEFAULT 0.00,
     status VARCHAR(50) NOT NULL DEFAULT 'Pending',
     transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

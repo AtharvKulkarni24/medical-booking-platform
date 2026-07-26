@@ -170,6 +170,13 @@ export default function Navbar() {
                           >
                             <span>⭐</span> Patient Reviews
                           </Link>
+                          <Link
+                            to="/labs/payouts"
+                            onClick={() => setIsDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition"
+                          >
+                            <span>💳</span> Payouts & Bank
+                          </Link>
                         </>
                       )}
 

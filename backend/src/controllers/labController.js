@@ -5,6 +5,18 @@ const {
   blacklistToken,
   revokeRefreshToken,
 } = require("../services/redisClient");
+const { createLinkedAccount } = require("../services/razorpayService");
+
+// --- HELPER: VERIFY LAB HAS ACTIVE LINKED ACCOUNT ---
+const isLabRazorpayActivated = async (labId) => {
+  const result = await db.query(
+    `SELECT is_verified, razorpay_account_id FROM labs WHERE lab_id = $1`,
+    [labId]
+  );
+  if (result.rowCount === 0) return false;
+  const lab = result.rows[0];
+  return Boolean(lab.is_verified && lab.razorpay_account_id);
+};
 
 // --- GET LAB DASHBOARD STATS ---
 exports.getDashboardStats = async (req, res) => {
@@ -278,6 +290,14 @@ exports.getSlotById = async (req, res) => {
 exports.createSlot = async (req, res) => {
   try {
     const labId = req.user.id;
+
+    if (!(await isLabRazorpayActivated(labId))) {
+      return res.status(403).json({
+        success: false,
+        error: "Payment setup required! You must connect and verify your Razorpay Linked Account under Payouts & Bank before creating time slots.",
+      });
+    }
+
     const { day_of_week, start_time, end_time, max_capacity } = req.body;
 
     if (day_of_week === undefined || !start_time || !end_time || max_capacity === undefined) {
@@ -337,6 +357,14 @@ exports.createSlot = async (req, res) => {
 exports.updateSlot = async (req, res) => {
   try {
     const labId = req.user.id;
+
+    if (!(await isLabRazorpayActivated(labId))) {
+      return res.status(403).json({
+        success: false,
+        error: "Payment setup required! You must connect and verify your Razorpay Linked Account before modifying time slots.",
+      });
+    }
+
     const { id } = req.params;
     const { day_of_week, start_time, end_time, max_capacity } = req.body;
 
@@ -647,6 +675,14 @@ exports.completeAppointment = async (req, res) => {
 exports.createTest = async (req, res) => {
   try {
     const labId = req.user.id;
+
+    if (!(await isLabRazorpayActivated(labId))) {
+      return res.status(403).json({
+        success: false,
+        message: "Payment setup required! You must connect and verify your Razorpay Linked Account under Payouts & Bank before publishing diagnostic tests.",
+      });
+    }
+
     const { test_name, description, price } = req.body;
 
     if (!test_name || !price) {
@@ -749,6 +785,14 @@ exports.getTestById = async (req, res) => {
 exports.updateTest = async (req, res) => {
   try {
     const labId = req.user.id;
+
+    if (!(await isLabRazorpayActivated(labId))) {
+      return res.status(403).json({
+        success: false,
+        message: "Payment setup required! You must connect and verify your Razorpay Linked Account before editing tests.",
+      });
+    }
+
     const { id } = req.params;
     const { test_name, description, price } = req.body;
 
@@ -817,4 +861,154 @@ exports.deleteTest = async (req, res) => {
       message: "Internal Server Error while deleting test.",
     });
   }
-};
+};
+
+// --- ONBOARD RAZORPAY LINKED ACCOUNT ---
+exports.onboardRazorpayAccount = async (req, res) => {
+  try {
+    const labId = req.user.id;
+    const { bank_account_number, bank_ifsc, bank_account_holder_name, business_entity_type = 'individual' } = req.body;
+
+    if (!bank_account_number || !bank_ifsc || !bank_account_holder_name) {
+      return res.status(400).json({
+        success: false,
+        error: "Bank Account Number, IFSC code, and Account Holder Name are required.",
+      });
+    }
+
+    // 1. Fetch current lab details
+    const labRes = await db.query(
+      `SELECT name, email, phone_number, address_text FROM labs WHERE lab_id = $1`,
+      [labId]
+    );
+
+    if (labRes.rowCount === 0) {
+      return res.status(404).json({ success: false, error: "Diagnostic center not found." });
+    }
+
+    const lab = labRes.rows[0];
+
+    // 2. Call Razorpay Route API service
+    const accountResult = await createLinkedAccount({
+      name: lab.name,
+      email: lab.email,
+      phone_number: lab.phone_number,
+      address_text: lab.address_text,
+      account_number: bank_account_number,
+      ifsc: bank_ifsc,
+      beneficiary_name: bank_account_holder_name,
+      business_type: business_entity_type,
+    });
+
+    // 3. Save Linked Account details in DB & mark lab as VERIFIED
+    const updateRes = await db.query(
+      `UPDATE labs
+       SET
+         razorpay_account_id = $1,
+         razorpay_account_status = $2,
+         bank_account_number = $3,
+         bank_ifsc = $4,
+         bank_account_holder_name = $5,
+         business_entity_type = $6,
+         is_verified = TRUE
+       WHERE lab_id = $7
+       RETURNING lab_id, is_verified, razorpay_account_id, razorpay_account_status, bank_account_number, bank_ifsc, bank_account_holder_name, business_entity_type;`,
+      [
+        accountResult.account_id,
+        accountResult.status || "ACTIVATED",
+        bank_account_number,
+        bank_ifsc,
+        bank_account_holder_name,
+        business_entity_type,
+        labId,
+      ]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Razorpay Linked Account configured successfully!",
+      account: updateRes.rows[0],
+    });
+  } catch (error) {
+    console.error("Razorpay Onboarding Error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to setup Razorpay Linked Account.",
+    });
+  }
+};
+
+// --- GET RAZORPAY PAYOUT STATUS & EARNINGS BREAKDOWN ---
+exports.getRazorpayPayoutStatus = async (req, res) => {
+  try {
+    const labId = req.user.id;
+
+    const labRes = await db.query(
+      `SELECT 
+         razorpay_account_id,
+         razorpay_account_status,
+         bank_account_number,
+         bank_ifsc,
+         bank_account_holder_name,
+         business_entity_type,
+         platform_commission_percentage
+       FROM labs
+       WHERE lab_id = $1`,
+      [labId]
+    );
+
+    if (labRes.rowCount === 0) {
+      return res.status(404).json({ success: false, error: "Lab not found." });
+    }
+
+    const labData = labRes.rows[0];
+
+    // Compute payout earnings stats from payments table
+    const earningsRes = await db.query(
+      `SELECT 
+         COALESCE(SUM(p.amount), 0) AS total_gross_volume,
+         COALESCE(SUM(p.platform_fee), 0) AS total_platform_fee,
+         COALESCE(SUM(p.lab_payout_amount), 0) AS total_net_payout,
+         COUNT(p.payment_id) AS total_paid_transactions
+       FROM appointments a
+       JOIN payments p ON a.appointment_id = p.appointment_id
+       WHERE a.lab_id = $1 AND p.status = 'Success'`,
+      [labId]
+    );
+
+    const earnings = earningsRes.rows[0];
+
+    // Mask bank account number for UI security (show last 4 digits)
+    let maskedAccount = null;
+    if (labData.bank_account_number) {
+      const len = labData.bank_account_number.length;
+      maskedAccount = "•".repeat(Math.max(0, len - 4)) + labData.bank_account_number.slice(-4);
+    }
+
+    res.status(200).json({
+      success: true,
+      payout_info: {
+        razorpay_account_id: labData.razorpay_account_id,
+        status: labData.razorpay_account_status || "NOT_LINKED",
+        bank_account_number: maskedAccount,
+        bank_ifsc: labData.bank_ifsc,
+        bank_account_holder_name: labData.bank_account_holder_name,
+        business_entity_type: labData.business_entity_type,
+        platform_commission_percentage: labData.platform_commission_percentage || 10.0,
+        earnings: {
+          total_gross_volume: parseFloat(earnings.total_gross_volume),
+          total_platform_fee: parseFloat(earnings.total_platform_fee),
+          total_net_payout: parseFloat(earnings.total_net_payout),
+          total_transactions: parseInt(earnings.total_paid_transactions, 10),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Fetch Razorpay Payout Status Error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Server error while fetching payout details.",
+    });
+  }
+};
+

@@ -10,26 +10,26 @@ const { blacklistToken } = require("../services/redisClient");
 const generateAccessToken = (id, userType) => {
   return jwt.sign(
     { id, userType },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN },
+    process.env.JWT_SECRET || "super_secret_access_key",
+    { expiresIn: process.env.JWT_EXPIRES_IN || "1h" },
   );
 };
 
 const generateRefreshToken = (id, userType) => {
   return jwt.sign(
     { id, userType },
-    process.env.JWT_REFRESH_SECRET,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN },
+    process.env.JWT_REFRESH_SECRET || "super_secret_refresh_key",
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "1h" },
   );
 };
 
 const sendRefreshTokenCookie = (res, token) => {
-  const isProduction=process.env.NODE_ENV==='production';
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookie("refreshToken", token, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction?'strict':'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    sameSite: isProduction ? "strict" : "lax",
+    maxAge: 1 * 60 * 60 * 1000, // 1 hour session cookie
   });
 };
 
@@ -248,16 +248,6 @@ exports.loginLab = async (req, res) => {
     }
 
     const lab = labData.rows[0];
-
-    // CHECK: Lab must be verified before login
-    if (!lab.is_verified) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          error: "Your account is not yet verified. Please contact admin.",
-        });
-    }
 
     // DEFENSE: Prevent bcrypt crash
     if (!lab.password_hash) {

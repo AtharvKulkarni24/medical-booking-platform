@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
+const { createSplitOrder, executePostPaymentTransfer, processRefund } = require("../services/razorpayService");
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -90,45 +91,45 @@ exports.createAppointmentOrder = async (req, res) => {
       return res.status(404).json({ success: false, error: "Test not found in this lab." });
     }
 
-    const amountInPaise = Math.round(testCheck.rows[0].price * 100);
-    const shortReceipt = `rcpt_${Date.now()}`;
-    const options = {
-      amount: amountInPaise,
-      currency: "INR",
-      receipt: shortReceipt,
-    };
+    // Fetch Lab's Razorpay Account status & commission rate
+    const labCheck = await db.query(
+      `SELECT razorpay_account_id, razorpay_account_status, platform_commission_percentage FROM labs WHERE lab_id = $1`,
+      [lab_id]
+    );
 
-    const keyId = (process.env.RAZORPAY_KEY_ID || "").trim();
-    const keySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+    const labInfo = labCheck.rows[0] || {};
+    const labAccountId = labInfo.razorpay_account_id;
+    const commissionPercent = parseFloat(labInfo.platform_commission_percentage || 10.0);
 
-    const razorpayInstance = new Razorpay({ key_id: keyId, key_secret: keySecret });
-
-    let order;
-    try {
-      order = await razorpayInstance.orders.create(options);
-    } catch (rzpErr) {
-      console.warn("⚠️ Razorpay SDK Order Creation Failed:", rzpErr?.error || rzpErr?.message || rzpErr);
-      
-      // Fallback for development if Razorpay test keys are unauthenticated/placeholder
-      if (process.env.NODE_ENV !== "production" || rzpErr?.statusCode === 401 || rzpErr?.error?.code === "BAD_REQUEST_ERROR") {
-        console.log("ℹ️ Using development fallback mock order for testing.");
-        order = {
-          id: `order_mock_${Date.now()}`,
-          amount: amountInPaise,
-          currency: "INR",
-        };
-      } else {
-        throw rzpErr;
+    // If lab hasn't linked account yet
+    if (!labAccountId || labInfo.razorpay_account_status !== 'ACTIVATED') {
+      if (process.env.NODE_ENV === "production") {
+        return res.status(400).json({
+          success: false,
+          error: "This diagnostic center has not activated payouts yet. Booking is currently unavailable.",
+        });
       }
     }
+
+    const testPrice = parseFloat(testCheck.rows[0].price);
+
+    const splitResult = await createSplitOrder({
+      amount: testPrice,
+      labAccountId: labAccountId || `acc_mock_lab_${lab_id}`,
+      commissionPercentage: commissionPercent,
+    });
+
+    const keyId = (process.env.RAZORPAY_KEY_ID || "").trim();
 
     res.status(200).json({
       success: true,
       order: {
-        id: order.id,
-        amount: order.amount,
-        currency: order.currency,
+        id: splitResult.order.id,
+        amount: splitResult.order.amount,
+        currency: splitResult.order.currency || "INR",
         key_id: keyId,
+        platform_fee: splitResult.platformFee,
+        lab_payout: splitResult.labPayout,
       },
     });
   } catch (error) {
@@ -210,13 +211,44 @@ exports.verifyAndBookAppointment = async (req, res) => {
 
     const newAppointmentId = appointmentResult.rows[0].appointment_id;
 
-    // 4. Log the transaction securely into the new payments table
+    // 4. Log the split transaction & execute post-payment transfer fallback if needed
+    const labQuery = await client.query(
+      `SELECT razorpay_account_id, platform_commission_percentage FROM labs WHERE lab_id = $1`,
+      [lab_id]
+    );
+    const labData = labQuery.rows[0] || {};
+    const commPercent = parseFloat(labData.platform_commission_percentage || 10.0);
+    const platformFee = Math.round(amountPaid * (commPercent / 100) * 100) / 100;
+    const labPayout = Math.round((amountPaid - platformFee) * 100) / 100;
+
+    let transferId = `trf_route_${Date.now()}`;
+    let paymentStatus = "Success";
+
+    if (labData.razorpay_account_id) {
+      try {
+        const postTransfer = await executePostPaymentTransfer({
+          paymentId: razorpay_payment_id || razorpay_order_id,
+          labAccountId: labData.razorpay_account_id,
+          amount: amountPaid,
+          commissionPercentage: commPercent,
+        });
+
+        if (postTransfer.success) {
+          transferId = postTransfer.transfer_id;
+        } else if (postTransfer.status === "TRANSFER_FAILED") {
+          paymentStatus = "TRANSFER_FAILED";
+        }
+      } catch (postErr) {
+        console.warn("Post-payment transfer fallback warning:", postErr);
+      }
+    }
+
     await client.query(
       `INSERT INTO payments 
-        (appointment_id, amount, gateway_provider, gateway_order_id, gateway_payment_id, status, transaction_date)
+        (appointment_id, amount, gateway_provider, gateway_order_id, gateway_payment_id, razorpay_transfer_id, platform_fee, lab_payout_amount, status, transaction_date)
        VALUES 
-        ($1, $2, 'Razorpay', $3, $4, 'Success', NOW())`,
-      [newAppointmentId, amountPaid, razorpay_order_id, razorpay_payment_id]
+        ($1, $2, 'Razorpay', $3, $4, $5, $6, $7, $8, NOW())`,
+      [newAppointmentId, amountPaid, razorpay_order_id, razorpay_payment_id, transferId, platformFee, labPayout, paymentStatus]
     );
 
     await client.query("COMMIT");
@@ -339,8 +371,45 @@ exports.cancelAppointment = async (req, res) => {
         });
     }
 
-    // 3. Update the status
-    // Note: In a real production app, you would also trigger a Razorpay refund API call here!
+    // 3. Find payment details for refund execution
+    const payCheck = await db.query(
+      `SELECT payment_id, amount, gateway_payment_id, gateway_order_id, razorpay_transfer_id 
+       FROM payments 
+       WHERE appointment_id = $1`,
+      [id]
+    );
+
+    let refundDetails = null;
+
+    if (payCheck.rowCount > 0) {
+      const pay = payCheck.rows[0];
+      const targetPaymentId = pay.gateway_payment_id || pay.gateway_order_id;
+
+      if (targetPaymentId) {
+        try {
+          refundDetails = await processRefund({
+            paymentId: targetPaymentId,
+            amount: parseFloat(pay.amount),
+          });
+        } catch (refundErr) {
+          console.error("⚠️ Failed to process Razorpay refund:", refundErr);
+        }
+      }
+
+      // Update payments table with refund details
+      await db.query(
+        `UPDATE payments 
+         SET 
+           status = 'Refunded',
+           refund_id = $1,
+           refund_status = 'PROCESSED',
+           refund_amount = $2
+         WHERE appointment_id = $3`,
+        [refundDetails?.refund_id || `rfnd_sys_${Date.now()}`, pay.amount, id]
+      );
+    }
+
+    // 4. Update appointment status
     await db.query(
       `UPDATE appointments SET status = 'CANCELLED' 
        WHERE appointment_id = $1`,
@@ -350,7 +419,8 @@ exports.cancelAppointment = async (req, res) => {
     res.status(200).json({
       success: true,
       message:
-        "Appointment cancelled successfully. Your time slot has been freed up.",
+        "Appointment cancelled successfully. Refund has been initiated back to your payment source.",
+      refund: refundDetails,
     });
   } catch (error) {
     console.error("Cancel Appointment Error:", error);

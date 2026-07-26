@@ -78,8 +78,22 @@ export default function LabDashboard() {
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 text-red-700 rounded-2xl border border-red-100 text-sm">
-              {error}
+            <div className="p-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-amber-500/30 rounded-3xl text-amber-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="text-3xl p-2 bg-amber-100 rounded-2xl text-amber-700">⚠️</span>
+                <div>
+                  <h3 className="font-extrabold text-base text-amber-950">Payout Account Setup Required</h3>
+                  <p className="text-xs text-amber-800 mt-1 max-w-xl">
+                    {error}
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/labs/payouts"
+                className="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition whitespace-nowrap"
+              >
+                Set Up Payout Bank Account →
+              </Link>
             </div>
           )}
 
@@ -125,10 +139,10 @@ export default function LabDashboard() {
           </div>
 
           {/* QUICK SHORTCUT CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <Link to="/labs/tests" className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition group">
               <div className="text-3xl mb-3">🧪</div>
-              <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition mb-1">Manage Diagnostic Catalog</h3>
+              <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition mb-1">Diagnostic Catalog</h3>
               <p className="text-slate-500 text-xs leading-relaxed">Add new blood, sonography, or screening tests with prices.</p>
             </Link>
 
@@ -142,6 +156,12 @@ export default function LabDashboard() {
               <div className="text-3xl mb-3">⭐</div>
               <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition mb-1">Patient Reviews</h3>
               <p className="text-slate-500 text-xs leading-relaxed">View ratings and comments submitted by verified patients.</p>
+            </Link>
+
+            <Link to="/labs/payouts" className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-3xl border border-emerald-200/90 shadow-sm hover:shadow-md transition group">
+              <div className="text-3xl mb-3">💳</div>
+              <h3 className="text-lg font-bold text-emerald-950 group-hover:text-emerald-700 transition mb-1">Payouts & Razorpay</h3>
+              <p className="text-emerald-800/80 text-xs leading-relaxed">Connect bank account, view gross volume & net settlements.</p>
             </Link>
           </div>
           
@@ -180,6 +200,13 @@ export default function LabDashboard() {
               className="flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
             >
               <span>⭐</span> Patient Reviews
+            </Link>
+
+            <Link 
+              to="/labs/payouts" 
+              className="flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-xs text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/70 transition"
+            >
+              <span>💳</span> Payouts & Bank
             </Link>
           </nav>
         </div>

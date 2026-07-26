@@ -22,6 +22,7 @@ import LabAppointments from './pages/lab/LabAppointments'
 import LabReviews from './pages/lab/LabReviews'
 import LabSlots from './pages/lab/LabSlots'
 import LabTests from './pages/lab/LabTests'
+import LabPayoutSettings from './pages/lab/LabPayoutSettings'
 
 export default function App() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/labs/reviews" element={<LabReviews />} />
           <Route path="/labs/slots" element={<LabSlots />} />
           <Route path="/labs/tests" element={<LabTests />} />
+          <Route path="/labs/payouts" element={<LabPayoutSettings />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

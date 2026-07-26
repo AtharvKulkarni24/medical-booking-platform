@@ -24,6 +24,7 @@ export default function TestDetail() {
   const [processingSlot, setProcessingSlot] = useState(null)
   
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [confirmSlotModal, setConfirmSlotModal] = useState(null)
   const [bookingSuccess, setBookingSuccess] = useState(null) 
 
   useEffect(() => {
@@ -87,19 +88,28 @@ export default function TestDetail() {
     return false;
   }
 
-  const handleSlotClick = async (slot) => {
+  const handleSlotClick = (slot) => {
+    setError('')
+    const token = localStorage.getItem('accessToken')
+    const userString = localStorage.getItem('user')
+    const user = userString ? JSON.parse(userString) : null
+    
+    if (!token || user?.role !== 'patient') {
+      setShowLoginModal(true)
+      return
+    }
+
+    setConfirmSlotModal(slot)
+  }
+
+  const executeRazorpayCheckout = async (slot) => {
+    setConfirmSlotModal(null)
     setProcessingSlot(slot.slot_id)
     setError('')
 
     const token = localStorage.getItem('accessToken')
     const userString = localStorage.getItem('user')
     const user = userString ? JSON.parse(userString) : null
-    
-    if (!token || user?.role !== 'patient') {
-      setProcessingSlot(null)
-      setShowLoginModal(true)
-      return
-    }
 
     try {
       const isScriptLoaded = await loadRazorpayScript()
@@ -261,6 +271,98 @@ export default function TestDetail() {
                 className="w-full bg-slate-100 text-slate-700 font-semibold py-3 rounded-xl hover:bg-slate-200 transition cursor-pointer text-xs"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM BOOKING & PAYOUT SPLIT MODAL */}
+      {confirmSlotModal && labDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl animate-fade-in-up border border-slate-100">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+                  Razorpay Route Split
+                </span>
+                <h3 className="text-xl font-bold text-slate-900 mt-1">Payment & Payout Breakdown</h3>
+              </div>
+              <button
+                onClick={() => setConfirmSlotModal(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* APPOINTMENT SUMMARY */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 mb-5 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Diagnostic Test:</span>
+                <span className="font-bold text-slate-900">{labDetails.test_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Diagnostic Center:</span>
+                <span className="font-bold text-slate-900">{labDetails.lab_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Scheduled Time:</span>
+                <span className="font-bold text-blue-600">
+                  {formatDateLabel(selectedDate)}, {formatTime(confirmSlotModal.start_time)} - {formatTime(confirmSlotModal.end_time)}
+                </span>
+              </div>
+            </div>
+
+            {/* PAYOUT SPLIT BREAKDOWN CARD */}
+            <div className="bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-white p-5 rounded-2xl shadow-lg mb-5 space-y-3">
+              <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider block">
+                Transparent Fee Distribution
+              </span>
+
+              <div className="space-y-2 text-sm pt-1 divide-y divide-slate-800">
+                <div className="flex justify-between pt-1">
+                  <span className="text-slate-300">Total Price:</span>
+                  <span className="font-bold text-white">₹{parseFloat(labDetails.price).toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between pt-2">
+                  <span className="text-emerald-300 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Direct Lab Payout (90%):
+                  </span>
+                  <span className="font-bold text-emerald-400">₹{(parseFloat(labDetails.price) * 0.9).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between pt-2">
+                  <span className="text-slate-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                    Platform Tech Fee (10%):
+                  </span>
+                  <span className="font-semibold text-slate-300">₹{(parseFloat(labDetails.price) * 0.1).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 flex items-center gap-2 text-[11px] text-slate-400">
+                <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <span>Automated Razorpay Route transfer & 100% refund reversal on cancellation.</span>
+              </div>
+            </div>
+
+            {/* ACTION BUTTONS */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setConfirmSlotModal(null)}
+                className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3.5 rounded-xl transition text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => executeRazorpayCheckout(confirmSlotModal)}
+                className="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-emerald-600/20 text-xs cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>Proceed & Pay ₹{labDetails.price}</span>
+                <span>→</span>
               </button>
             </div>
           </div>

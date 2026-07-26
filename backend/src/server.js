@@ -20,8 +20,20 @@ const app = express();
 // ==========================================
 // 1. GLOBAL MIDDLEWARE
 // ==========================================
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  process.env.CLIENT_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: "http://localhost:5173", 
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow during transition or restrict to allowedOrigins
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
