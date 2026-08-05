@@ -18,19 +18,6 @@ export default function Reviews() {
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user) navigate('/login', { replace: true })
-      else if (user.role !== 'patient') navigate(user.role === 'lab' ? '/labs' : '/', { replace: true })
-    }
-  }, [user, authLoading, navigate])
-
-  useEffect(() => {
-    if (user && user.role === 'patient') {
-      fetchReviewData();
-    }
-  }, [user]);
-
   const fetchReviewData = async () => {
     try {
       setDataLoading(true);
@@ -61,6 +48,19 @@ export default function Reviews() {
       setDataLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) navigate('/login', { replace: true })
+      else if (user.role !== 'patient') navigate(user.role === 'lab' ? '/labs' : '/', { replace: true })
+    }
+  }, [user, authLoading, navigate])
+
+  useEffect(() => {
+    if (user && user.role === 'patient') {
+      fetchReviewData();
+    }
+  }, [user]);
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
@@ -103,13 +103,7 @@ export default function Reviews() {
     }
   };
 
-  const formatTime = (timeStr) => {
-    if (!timeStr) return '';
-    const [h, m] = timeStr.split(':');
-    const date = new Date();
-    date.setHours(h, m);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  };
+
 
   if (authLoading || dataLoading) {
     return (

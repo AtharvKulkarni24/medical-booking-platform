@@ -14,7 +14,7 @@ const loadRazorpayScript = () => {
 export default function TestDetail() {
   const navigate = useNavigate()
   const { labId, testId } = useParams()
-  
+
   const [labDetails, setLabDetails] = useState(null)
   const [availableSlots, setAvailableSlots] = useState([])
   const [dates, setDates] = useState([])
@@ -22,16 +22,16 @@ export default function TestDetail() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [processingSlot, setProcessingSlot] = useState(null)
-  
+
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [confirmSlotModal, setConfirmSlotModal] = useState(null)
-  const [bookingSuccess, setBookingSuccess] = useState(null) 
+  const [bookingSuccess, setBookingSuccess] = useState(null)
 
   useEffect(() => {
     const next7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date()
       d.setDate(d.getDate() + i)
-      return d.toISOString().split('T')[0] 
+      return d.toISOString().split('T')[0]
     })
     setDates(next7Days)
     setSelectedDate(next7Days[0])
@@ -93,7 +93,7 @@ export default function TestDetail() {
     const token = localStorage.getItem('accessToken')
     const userString = localStorage.getItem('user')
     const user = userString ? JSON.parse(userString) : null
-    
+
     if (!token || user?.role !== 'patient') {
       setShowLoginModal(true)
       return
@@ -117,7 +117,7 @@ export default function TestDetail() {
 
       const orderResponse = await fetch('http://localhost:5000/api/appointments/create-order', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -128,7 +128,7 @@ export default function TestDetail() {
           appointment_date: selectedDate
         })
       })
-      
+
       const orderData = await orderResponse.json()
       if (!orderResponse.ok) throw new Error(orderData.error || "Failed to initialize booking order.")
 
@@ -136,7 +136,7 @@ export default function TestDetail() {
       if (orderData.order.id.startsWith("order_simulated_")) {
         const verifyRes = await fetch('http://localhost:5000/api/appointments/verify-and-book', {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -172,12 +172,12 @@ export default function TestDetail() {
         currency: orderData.order.currency,
         name: "MedBook Diagnostics",
         description: `Booking: ${labDetails.test_name} at ${labDetails.lab_name}`,
-        order_id: orderData.order.id, 
+        order_id: orderData.order.id,
         handler: async function (response) {
           try {
             const verifyRes = await fetch('http://localhost:5000/api/appointments/verify-and-book', {
               method: 'POST',
-              headers: { 
+              headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
               },
@@ -202,7 +202,7 @@ export default function TestDetail() {
               time: `${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}`,
               amount: labDetails.price
             })
-            
+
           } catch (verifyErr) {
             alert(`Payment succeeded, but booking failed: ${verifyErr.message}.`)
           } finally {
@@ -210,7 +210,7 @@ export default function TestDetail() {
           }
         },
         prefill: {
-          name: user?.name || "Patient", 
+          name: user?.name || "Patient",
           email: user?.email || "",
           contact: user?.phone_number || "9999999999"
         },
@@ -247,7 +247,7 @@ export default function TestDetail() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8 relative">
-      
+
       {/* LOGIN REQUIRED MODAL */}
       {showLoginModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
@@ -260,13 +260,13 @@ export default function TestDetail() {
               Please sign in as a Patient to book your diagnostic time slot and complete payment.
             </p>
             <div className="space-y-3">
-              <button 
+              <button
                 onClick={() => navigate(`/login?redirect=/search/labs/${labId}/tests/${testId}`)}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-md cursor-pointer text-xs"
               >
                 Log In Now
               </button>
-              <button 
+              <button
                 onClick={() => setShowLoginModal(false)}
                 className="w-full bg-slate-100 text-slate-700 font-semibold py-3 rounded-xl hover:bg-slate-200 transition cursor-pointer text-xs"
               >
@@ -414,7 +414,7 @@ export default function TestDetail() {
 
       {/* MAIN LAYOUT */}
       <div className="max-w-6xl mx-auto">
-        
+
         {/* LAB & TEST HEADER */}
         {labDetails && (
           <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-200/80 mb-8">
@@ -441,7 +441,7 @@ export default function TestDetail() {
         {/* DATE SELECTOR PILLS */}
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200/80 mb-8">
           <h2 className="text-xl font-bold text-slate-900 mb-4">1. Select Appointment Date</h2>
-          
+
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
             {dates.map((dateStr) => {
               const isSelected = selectedDate === dateStr;
@@ -449,11 +449,10 @@ export default function TestDetail() {
                 <button
                   key={dateStr}
                   onClick={() => setSelectedDate(dateStr)}
-                  className={`px-5 py-3.5 rounded-2xl font-semibold text-xs sm:text-sm whitespace-nowrap transition cursor-pointer flex flex-col items-center gap-1 min-w-[100px] border ${
-                    isSelected
+                  className={`px-5 py-3.5 rounded-2xl font-semibold text-xs sm:text-sm whitespace-nowrap transition cursor-pointer flex flex-col items-center gap-1 min-w-[100px] border ${isSelected
                       ? 'bg-blue-600 text-white border-blue-600 shadow-md scale-105'
                       : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   <span className="opacity-90">{formatDateLabel(dateStr)}</span>
                 </button>
@@ -484,29 +483,29 @@ export default function TestDetail() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {availableSlots.map((slot) => {
                 const isPassed = checkIsSlotPassed(slot.start_time);
-                const availableSeats = slot.available_seats;
+                const availableSeats = slot.available_seats !== undefined
+                  ? slot.available_seats
+                  : (parseInt(slot.max_capacity || 0, 10) - parseInt(slot.current_bookings || 0, 10));
                 const isFull = availableSeats <= 0 || isPassed;
                 const isProcessing = processingSlot === slot.slot_id;
 
                 return (
                   <div
                     key={slot.slot_id}
-                    className={`p-5 rounded-2xl border transition duration-200 flex flex-col justify-between ${
-                      isFull
+                    className={`p-5 rounded-2xl border transition duration-200 flex flex-col justify-between ${isFull
                         ? 'bg-slate-100 border-slate-200 opacity-60'
                         : 'bg-white border-slate-200 hover:border-blue-500 hover:shadow-lg'
-                    }`}
+                      }`}
                   >
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-base font-bold text-slate-900">
                           {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
                         </span>
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                          isFull 
-                            ? 'bg-slate-200 text-slate-600' 
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${isFull
+                            ? 'bg-slate-200 text-slate-600'
                             : 'bg-green-100 text-green-700'
-                        }`}>
+                          }`}>
                           {isPassed ? 'Passed' : availableSeats > 0 ? `${availableSeats} Available` : 'Full'}
                         </span>
                       </div>
@@ -515,11 +514,10 @@ export default function TestDetail() {
                     <button
                       onClick={() => handleSlotClick(slot)}
                       disabled={isFull || isProcessing}
-                      className={`mt-4 w-full py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-2 ${
-                        isFull
+                      className={`mt-4 w-full py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-2 ${isFull
                           ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
-                      }`}
+                        }`}
                     >
                       {isProcessing ? (
                         <>

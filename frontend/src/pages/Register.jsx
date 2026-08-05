@@ -86,19 +86,20 @@ export default function Register() {
           ? "http://localhost:5000/api/patients/register"
           : "http://localhost:5000/api/labs/register";
 
-      const { confirm_password, address, ...restData } = formData;
+      const { address, ...restData } = formData;
+      delete restData.confirm_password;
       const submitData =
         role === "patient"
           ? {
-              name: restData.name,
-              email: restData.email,
-              password: restData.password,
-              phone_number: restData.phone_number,
-            }
+            name: restData.name,
+            email: restData.email,
+            password: restData.password,
+            phone_number: restData.phone_number,
+          }
           : {
-              ...restData,
-              address_text: address,
-            };
+            ...restData,
+            address_text: address,
+          };
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -132,7 +133,7 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
       <div className="max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl border border-slate-200/80 shadow-xl animate-fade-in-up">
-        
+
         <div className="text-center mb-8">
           <span className="text-xs font-extrabold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
             New Registration
@@ -146,22 +147,20 @@ export default function Register() {
           <button
             type="button"
             onClick={() => setRole("patient")}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${
-              role === "patient"
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${role === "patient"
                 ? "bg-white text-blue-600 shadow-sm"
                 : "text-slate-500 hover:text-slate-900"
-            }`}
+              }`}
           >
             👤 Patient
           </button>
           <button
             type="button"
             onClick={() => setRole("lab")}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${
-              role === "lab"
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${role === "lab"
                 ? "bg-white text-blue-600 shadow-sm"
                 : "text-slate-500 hover:text-slate-900"
-            }`}
+              }`}
           >
             🧪 Diagnostic Lab
           </button>

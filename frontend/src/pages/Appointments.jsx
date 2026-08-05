@@ -130,7 +130,14 @@ export default function Appointments() {
     });
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, isMissed = false) => {
+    if (isMissed) {
+      return (
+        <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+          Missed Visit
+        </span>
+      );
+    }
     switch (status) {
       case "CONFIRMED":
         return (
@@ -173,7 +180,7 @@ export default function Appointments() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8 relative">
-      
+
       {/* CANCELLATION MODAL */}
       {cancelModalData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
@@ -242,9 +249,8 @@ export default function Appointments() {
         <div className="flex border-b border-slate-200 mb-8 gap-8">
           <button
             onClick={() => setActiveTab("upcoming")}
-            className={`pb-4 font-bold text-sm sm:text-base transition cursor-pointer flex items-center gap-2 relative ${
-              activeTab === "upcoming" ? "text-blue-600 border-b-2 border-blue-600" : "text-slate-500 hover:text-slate-900"
-            }`}
+            className={`pb-4 font-bold text-sm sm:text-base transition cursor-pointer flex items-center gap-2 relative ${activeTab === "upcoming" ? "text-blue-600 border-b-2 border-blue-600" : "text-slate-500 hover:text-slate-900"
+              }`}
           >
             <span>Upcoming Bookings</span>
             <span className="bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold">{appointments.upcoming.length}</span>
@@ -252,9 +258,8 @@ export default function Appointments() {
 
           <button
             onClick={() => setActiveTab("past")}
-            className={`pb-4 font-bold text-sm sm:text-base transition cursor-pointer flex items-center gap-2 relative ${
-              activeTab === "past" ? "text-blue-600 border-b-2 border-blue-600" : "text-slate-500 hover:text-slate-900"
-            }`}
+            className={`pb-4 font-bold text-sm sm:text-base transition cursor-pointer flex items-center gap-2 relative ${activeTab === "past" ? "text-blue-600 border-b-2 border-blue-600" : "text-slate-500 hover:text-slate-900"
+              }`}
           >
             <span>Past & History</span>
             <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full text-xs font-bold">{appointments.past.length}</span>
@@ -298,7 +303,7 @@ export default function Appointments() {
                 >
                   <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-3">
-                      {getStatusBadge(app.status)}
+                      {getStatusBadge(app.status, isMissed)}
                       <span className="text-xs font-bold text-slate-400 font-mono">
                         #APP-{app.appointment_id}
                       </span>

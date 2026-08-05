@@ -11,7 +11,7 @@ export const AuthProvider = ({ children }) => {
     // Check local storage for existing session on app load
     const storedToken = localStorage.getItem('accessToken');
     const storedUser = localStorage.getItem('user');
-    
+
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (credentials, role) => {
-    const endpoint = role === 'patient' 
+    const endpoint = role === 'patient'
       ? 'http://localhost:5000/api/patients/login'
       : 'http://localhost:5000/api/labs/login';
 
@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials),
       // IMPORTANT: Allows the backend to set the refreshToken cookie
-      credentials: 'include' 
+      credentials: 'include'
     });
 
     const data = await response.json();
@@ -38,14 +38,14 @@ export const AuthProvider = ({ children }) => {
       throw new Error(data.error || 'Failed to login');
     }
 
-    const userWithRole={
+    const userWithRole = {
       ...data.user,
-      role:role
+      role: role
     }
     // Save access token and user info
     setToken(data.accessToken);
     setUser(userWithRole);
-    
+
     localStorage.setItem('accessToken', data.accessToken);
     localStorage.setItem('user', JSON.stringify(userWithRole));
 

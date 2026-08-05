@@ -72,9 +72,12 @@ if (require.main === module) {
 
   const startServer = async () => {
     try {
-      // Initialize Redis strictly. If it fails, it should throw an error, not fall back.
-      await initRedis();
-      console.log("🟢 Redis connected successfully");
+      const redisClient = await initRedis();
+      if (redisClient) {
+        console.log("🟢 Redis connected successfully");
+      } else {
+        console.log("🟡 Redis unavailable. Running cleanly with in-memory fallback.");
+      }
 
       app.listen(PORT, () => {
         console.log(`🚀 Server is running securely on http://localhost:${PORT}`);

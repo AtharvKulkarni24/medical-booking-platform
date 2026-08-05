@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 
 export default function SearchLabs() {
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  
+
   const lab_name = searchParams.get('lab_name') || ''
   const lat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')) : undefined
   const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')) : undefined
@@ -15,22 +14,10 @@ export default function SearchLabs() {
   const [isLocating, setIsLocating] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (!lat || !lng) {
-      handleGetLocation()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (lat && lng) {
-      fetchLabs()
-    }
-  }, [lab_name, lat, lng])
-
   const handleGetLocation = () => {
     setIsLocating(true)
     setError('')
-    
+
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser.')
       setIsLocating(false)
@@ -71,6 +58,18 @@ export default function SearchLabs() {
     }
   }
 
+  useEffect(() => {
+    if (!lat || !lng) {
+      handleGetLocation()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (lat && lng) {
+      fetchLabs()
+    }
+  }, [lab_name, lat, lng])
+
   const handleSearchSubmit = (e) => {
     e.preventDefault()
     const newParams = new URLSearchParams(searchParams)
@@ -85,7 +84,7 @@ export default function SearchLabs() {
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
-        
+
         {/* SEARCH HEADER */}
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200/80 mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -106,7 +105,7 @@ export default function SearchLabs() {
               <span>{isLocating ? 'Detecting Location...' : 'Update Location'}</span>
             </button>
           </div>
-          
+
           <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <span className="absolute left-4 top-3.5 text-slate-400 text-base">🔍</span>
@@ -135,14 +134,14 @@ export default function SearchLabs() {
             <p className="text-slate-700 font-medium text-lg">Detecting your location...</p>
           </div>
         )}
-        
+
         {/* ERROR NOTICE */}
         {error && (
           <div className="bg-red-50 text-red-700 p-6 rounded-2xl border border-red-100 mb-8 text-center max-w-lg mx-auto">
             <p className="font-semibold text-sm mb-2">{error}</p>
             {(!lat || !lng) && (
-              <button 
-                onClick={handleGetLocation} 
+              <button
+                onClick={handleGetLocation}
                 className="inline-block mt-2 px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition cursor-pointer"
               >
                 Allow Location Access
@@ -154,8 +153,8 @@ export default function SearchLabs() {
         {/* LOADING DIRECTORY */}
         {isLoading && !isLocating && (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-200/80">
-             <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-             <p className="text-slate-500 font-medium">Searching directory...</p>
+            <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-slate-500 font-medium">Searching directory...</p>
           </div>
         )}
 
@@ -182,8 +181,8 @@ export default function SearchLabs() {
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {labs.map((lab) => (
-                  <Link 
-                    key={lab.lab_id} 
+                  <Link
+                    key={lab.lab_id}
                     to={`/search/labs/${lab.lab_id}`}
                     className="glass-card hover-lift p-6 rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl cursor-pointer transition-all duration-300 flex flex-col justify-between group"
                   >
