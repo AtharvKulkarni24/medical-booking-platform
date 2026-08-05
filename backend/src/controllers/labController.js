@@ -26,14 +26,15 @@ exports.getDashboardStats = async (req, res) => {
     // Run all 4 queries simultaneously using Promise.all for speed
     const [testsQuery, labQuery, completedQuery, upcomingQuery] = await Promise.all([
       db.query(`SELECT COUNT(*) FROM tests WHERE lab_id = $1`, [labId]),
-      db.query(`SELECT average_rating FROM labs WHERE lab_id = $1`, [labId]),
+      db.query(`SELECT average_rating, is_verified FROM labs WHERE lab_id = $1`, [labId]),
       db.query(`SELECT COUNT(*) FROM appointments WHERE lab_id = $1 AND status = 'COMPLETED'`, [labId]),
       db.query(`SELECT COUNT(*) FROM appointments WHERE lab_id = $1 AND status = 'CONFIRMED' AND appointment_date >= CURRENT_DATE`, [labId])
     ]);
 
     const stats = {
       total_tests: parseInt(testsQuery.rows[0].count, 10),
-      average_rating: labQuery.rows[0].average_rating || "0.0",
+      average_rating: labQuery.rows[0]?.average_rating || "0.0",
+      is_verified: labQuery.rows[0]?.is_verified || false,
       completed_appointments: parseInt(completedQuery.rows[0].count, 10),
       upcoming_bookings: parseInt(upcomingQuery.rows[0].count, 10)
     };
@@ -94,7 +95,7 @@ exports.getLabProfile = async (req, res) => {
 exports.updateLabProfile = async (req, res) => {
   try {
     const labId = req.user.id;
-    const { name, address_text, latitude, longitude } = req.body;
+    const { name, address_text, latitude, longitude, phone_number } = req.body;
 
     const query = `
       UPDATE labs 
@@ -105,16 +106,28 @@ exports.updateLabProfile = async (req, res) => {
             WHEN $3::numeric IS NOT NULL AND $4::numeric IS NOT NULL 
             THEN ST_SetSRID(ST_MakePoint($4, $3), 4326) 
             ELSE location_coordinates 
-        END
-      WHERE lab_id = $5
-      RETURNING lab_id, name, address_text, ST_Y(location_coordinates::geometry) AS latitude, ST_X(location_coordinates::geometry) AS longitude;
+        END,
+        phone_number = COALESCE($5, phone_number),
+        is_verified = FALSE
+      WHERE lab_id = $6
+      RETURNING 
+        lab_id, 
+        name, 
+        email, 
+        phone_number, 
+        address_text, 
+        ST_Y(location_coordinates::geometry) AS latitude, 
+        ST_X(location_coordinates::geometry) AS longitude, 
+        is_verified, 
+        average_rating;
     `;
 
     const result = await db.query(query, [
-      name,
-      address_text,
-      latitude,
-      longitude,
+      name || null,
+      address_text || null,
+      latitude ? parseFloat(latitude) : null,
+      longitude ? parseFloat(longitude) : null,
+      phone_number || null,
       labId,
     ]);
 
@@ -126,7 +139,7 @@ exports.updateLabProfile = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Profile updated successfully.",
+      message: "Diagnostic center profile updated successfully. Status is now Pending Verification.",
       profile: result.rows[0],
     });
   } catch (error) {

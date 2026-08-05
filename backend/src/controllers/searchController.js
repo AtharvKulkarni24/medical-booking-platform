@@ -112,7 +112,7 @@ exports.searchLabs = async (req, res) => {
                 total_pages: 0,
                 has_next_page: false,
                 has_prev_page: false,
-                message: `No verified labs found offering "${test}" within a 50 km radius.`,
+                message: `No verified labs found offering ${test} within a 50 km radius.`,
                 labs: []
             });
         }
@@ -126,7 +126,7 @@ exports.searchLabs = async (req, res) => {
             total_pages: totalPages,
             has_next_page: pageNum < totalPages,
             has_prev_page: pageNum > 1,
-            message: `Found ${totalResults} labs offering "${test}".`,
+            message: `Found ${totalResults} labs offering ${test}.`,
             labs: result.rows
         });
 

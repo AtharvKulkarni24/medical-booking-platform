@@ -141,9 +141,12 @@ export default function LabPayoutSettings() {
                 ACTIVATED
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-800">
-                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                ACTION REQUIRED
+              <span className="flex items-center gap-2 text-xs font-bold text-amber-300 bg-amber-950/90 px-3 py-1 rounded-lg border border-amber-500/80 shadow-md animate-pulse">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
+                </span>
+                NOT ACTIVE (ACTION REQUIRED)
               </span>
             )}
           </div>
@@ -250,11 +253,12 @@ export default function LabPayoutSettings() {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-300 p-4">
-                <svg className="w-12 h-12 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <p className="text-sm font-semibold text-slate-700">No Account Linked Yet</p>
+              <div className="text-center py-6 bg-amber-50/60 rounded-2xl border border-amber-200 p-5">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 mb-3 animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                  Status: Not Active
+                </span>
+                <p className="text-sm font-bold text-slate-800">No Account Linked Yet</p>
                 <p className="text-xs text-slate-500 mt-1">
                   Fill out your bank details to connect your Razorpay Route account so patients can book your diagnostic tests.
                 </p>

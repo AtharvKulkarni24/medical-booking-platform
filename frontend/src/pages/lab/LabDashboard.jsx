@@ -77,6 +77,26 @@ export default function LabDashboard() {
             </Link>
           </div>
 
+          {stats.is_verified === false && (
+            <div className="p-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-amber-500/30 rounded-3xl text-amber-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="text-3xl p-2 bg-amber-100 rounded-2xl text-amber-700">⏳</span>
+                <div>
+                  <h3 className="font-extrabold text-base text-amber-950">Profile Pending Verification</h3>
+                  <p className="text-xs text-amber-800 mt-1 max-w-xl">
+                    Your center details or profile changes are currently pending review. Verified diagnostic centers are publicly discoverable on patient searches.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/profile"
+                className="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition whitespace-nowrap"
+              >
+                View Profile Status →
+              </Link>
+            </div>
+          )}
+
           {error && (
             <div className="p-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-amber-500/30 rounded-3xl text-amber-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3">

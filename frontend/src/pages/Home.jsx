@@ -13,8 +13,6 @@ const popularTests = [
   { id: 8, name: 'Thyroid Profile', description: 'Checks T3, T4 and TSH levels to evaluate thyroid gland health.', icon: '🦋', badge: 'Specialized' },
 ]
 
-const quickCategories = ['Blood Test', 'Sonography Test', 'Kidney Test', 'Sugar Test', 'Thyroid Profile'];
-
 const steps = [
   { step: '01', title: 'Select Test & Location', desc: 'Choose from certified diagnostic tests and find nearby verified lab centers.' },
   { step: '02', title: 'Pick Convenient Slot', desc: 'Select a suitable date and time slot with instant real-time confirmation.' },
@@ -35,13 +33,14 @@ export default function Home() {
     }
   }, [user, authLoading, navigate])
 
+  // 1. Click on a specific TEST card -> search based on TEST AND LOCATION
   const handleTestClick = (testName) => {
     setIsLocating(true)
     setActiveTest(testName)
 
     if (!navigator.geolocation) {
       setIsLocating(false)
-      navigate(`/search/labs?lab_name=${encodeURIComponent(testName)}`)
+      navigate(`/search?test=${encodeURIComponent(testName)}`)
       return
     }
 
@@ -54,20 +53,50 @@ export default function Home() {
       (err) => {
         console.warn("Location permission denied or timed out:", err)
         setIsLocating(false)
-        navigate(`/search/labs`)
+        navigate(`/search?test=${encodeURIComponent(testName)}`)
       },
       { timeout: 4000 }
     )
   }
 
+  // 2. Click "Find Labs" button -> search based ONLY ON LOCATION (and optional lab name)
   const handleDirectSearchSubmit = (e) => {
     e.preventDefault()
+    setIsLocating(true)
+    setActiveTest('Nearby Labs')
     const query = searchQuery.trim()
-    if (!query) {
-      navigate('/search/labs')
+
+    if (!navigator.geolocation) {
+      setIsLocating(false)
+      if (query) {
+        navigate(`/search/labs?lab_name=${encodeURIComponent(query)}`)
+      } else {
+        navigate('/search/labs')
+      }
       return
     }
-    handleTestClick(query)
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        setIsLocating(false)
+        if (query) {
+          navigate(`/search/labs?lab_name=${encodeURIComponent(query)}&lat=${latitude}&lng=${longitude}`)
+        } else {
+          navigate(`/search/labs?lat=${latitude}&lng=${longitude}`)
+        }
+      },
+      (err) => {
+        console.warn("Location permission denied or timed out:", err)
+        setIsLocating(false)
+        if (query) {
+          navigate(`/search/labs?lab_name=${encodeURIComponent(query)}`)
+        } else {
+          navigate('/search/labs')
+        }
+      },
+      { timeout: 4000 }
+    )
   }
 
   if (authLoading) {
@@ -117,7 +146,7 @@ export default function Home() {
               <span className="text-xl">🔍</span>
               <input 
                 type="text"
-                placeholder="Search test e.g. Blood Test, Sonography, Sugar..."
+                placeholder="Search diagnostic center name or location..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-transparent border-none text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-base"
@@ -131,20 +160,6 @@ export default function Home() {
               <span className="text-lg">➔</span>
             </button>
           </form>
-
-          {/* Quick Category Chips */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-6 max-w-2xl mx-auto">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-2">Popular:</span>
-            {quickCategories.map((cat, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleTestClick(cat)}
-                className="px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-600 border border-slate-200/80 text-xs font-semibold transition cursor-pointer shadow-sm"
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
 
         </div>
       </section>
@@ -216,15 +231,6 @@ export default function Home() {
                 <p className="text-slate-300 text-xs leading-relaxed relative z-10">{item.desc}</p>
               </div>
             ))}
-          </div>
-
-          <div className="text-center mt-14">
-            <Link
-              to="/search/labs"
-              className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-8 py-4 rounded-2xl shadow-lg transition"
-            >
-              Browse All Diagnostic Centers →
-            </Link>
           </div>
         </div>
       </section>

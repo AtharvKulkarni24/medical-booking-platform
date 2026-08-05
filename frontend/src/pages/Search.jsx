@@ -52,11 +52,14 @@ export default function Search() {
             <span className="text-xs font-extrabold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
               Search Results
             </span>
-            <h1 className="text-2xl md:text-4xl font-extrabold text-slate-900 mt-2 mb-1">
-              Diagnostic Centers Offering "{test}"
+            <h1 className="text-lg md:text-2xl font-bold text-slate-800 mt-2.5 mb-1.5 flex flex-wrap items-center gap-2">
+              <span>Diagnostic Centers Offering</span>
+              <span className="bg-blue-50 text-blue-700 text-base md:text-xl font-bold px-3 py-1 rounded-xl border border-blue-100/80 shadow-xs">
+                {test}
+              </span>
             </h1>
             {data && (
-              <p className="text-slate-500 text-sm md:text-base">
+              <p className="text-slate-500 text-xs md:text-sm font-medium mt-1">
                 {data.message || `Found ${data.labs?.length || 0} labs nearby`}
               </p>
             )}
@@ -151,7 +154,7 @@ export default function Search() {
           <div className="bg-white p-12 sm:p-16 rounded-3xl text-center border border-slate-200/80 shadow-sm max-w-lg mx-auto">
             <div className="text-5xl mb-4">🧪</div>
             <h3 className="text-2xl font-bold text-slate-900 mb-2">No Labs Found Nearby</h3>
-            <p className="text-slate-500 text-sm mb-6">We couldn't find diagnostic centers offering "{test}" within your immediate area.</p>
+            <p className="text-slate-500 text-sm mb-6">We couldn't find diagnostic centers offering <span className="font-semibold text-slate-700">{test}</span> within your immediate area.</p>
             <Link
               to="/search/labs"
               className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-sm"
