@@ -88,6 +88,9 @@ CREATE TABLE payments (
     refund_id VARCHAR(255),
     refund_status VARCHAR(50) DEFAULT 'NOT_REFUNDED',
     refund_amount DECIMAL(10, 2) DEFAULT 0.00,
+    payout_status VARCHAR(50) DEFAULT 'PENDING',
+    payout_date TIMESTAMP,
+    payout_error TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'Pending',
     transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

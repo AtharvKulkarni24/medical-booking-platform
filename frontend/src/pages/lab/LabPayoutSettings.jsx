@@ -108,6 +108,8 @@ export default function LabPayoutSettings() {
     total_gross_volume: 0,
     total_platform_fee: 0,
     total_net_payout: 0,
+    pending_midnight_payout: 0,
+    completed_midnight_payout: 0,
     total_transactions: 0,
   };
 
@@ -123,11 +125,11 @@ export default function LabPayoutSettings() {
                 Payouts & Payment Splitting
               </h1>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Razorpay Route
+                Midnight Batch Payouts
               </span>
             </div>
             <p className="text-slate-300 text-sm mt-1">
-              Direct settlement to your lab's bank account with automated fee distribution & refund reversals.
+              Direct settlement to your lab's bank account every midnight after appointment completion.
             </p>
           </div>
 
@@ -159,21 +161,21 @@ export default function LabPayoutSettings() {
               </svg>
             </div>
           </div>
-          <p className="text-2xl font-bold text-slate-900 mt-2">₹{earnings.total_gross_volume.toLocaleString("en-IN")}</p>
+          <p className="text-2xl font-bold text-slate-900 mt-2">₹{(earnings.total_gross_volume || 0).toLocaleString("en-IN")}</p>
           <p className="text-xs text-slate-400 mt-1">Total revenue collected from patients</p>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Platform Fee ({payoutInfo?.platform_commission_percentage || 10}%)</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Midnight Payout</span>
             <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
           </div>
-          <p className="text-2xl font-bold text-slate-900 mt-2">₹{earnings.total_platform_fee.toLocaleString("en-IN")}</p>
-          <p className="text-xs text-slate-400 mt-1">App commission & service charge</p>
+          <p className="text-2xl font-bold text-amber-600 mt-2">₹{(earnings.pending_midnight_payout || 0).toLocaleString("en-IN")}</p>
+          <p className="text-xs text-slate-400 mt-1">Scheduled for next midnight batch</p>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
@@ -185,8 +187,8 @@ export default function LabPayoutSettings() {
               </svg>
             </div>
           </div>
-          <p className="text-2xl font-bold text-emerald-600 mt-2">₹{earnings.total_net_payout.toLocaleString("en-IN")}</p>
-          <p className="text-xs text-slate-400 mt-1">Direct payouts to your bank account</p>
+          <p className="text-2xl font-bold text-emerald-600 mt-2">₹{(earnings.completed_midnight_payout ?? 0).toLocaleString("en-IN")}</p>
+          <p className="text-xs text-slate-400 mt-1">Transferred to your bank account</p>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
@@ -198,7 +200,7 @@ export default function LabPayoutSettings() {
               </svg>
             </div>
           </div>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{earnings.total_transactions}</p>
+          <p className="text-2xl font-bold text-slate-900 mt-2">{earnings.total_transactions || 0}</p>
           <p className="text-xs text-slate-400 mt-1">Paid appointment transactions</p>
         </div>
       </div>

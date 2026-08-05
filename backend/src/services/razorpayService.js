@@ -77,91 +77,64 @@ exports.createLinkedAccount = async (labData) => {
 };
 
 /**
- * Create a Razorpay Order with Payment Split (Primary Strategy)
- * Fallback: If instant split order creation fails, creates a Standard Order & triggers Post-Payment Transfer
+/**
+ * Create a standard Razorpay Order for patient checkout (100% held in Platform Account)
+ * Midnight batch job will handle payout transfers to labs after appointment completion.
  */
-exports.createSplitOrder = async ({ amount, labAccountId, commissionPercentage = 10 }) => {
+exports.createStandardOrder = async ({ amount, commissionPercentage = 10 }) => {
   const instance = getRazorpayInstance();
   const totalAmountPaise = Math.round(amount * 100);
   const platformFeePaise = Math.round(totalAmountPaise * (commissionPercentage / 100));
   const labPayoutPaise = totalAmountPaise - platformFeePaise;
 
-  const shortReceipt = `rcpt_split_${Date.now()}`;
-
-  const splitOptions = {
-    amount: totalAmountPaise,
-    currency: "INR",
-    receipt: shortReceipt,
-    transfers: [
-      {
-        account: labAccountId,
-        amount: labPayoutPaise,
-        currency: "INR",
-        on_hold: 0,
-        notes: {
-          booking_type: "lab_appointment",
-          commission_percentage: `${commissionPercentage}%`,
-        },
-      },
-    ],
-  };
+  const shortReceipt = `rcpt_ord_${Date.now()}`;
 
   try {
-    // Primary Option: Instant Split Order Creation
-    const order = await instance.orders.create(splitOptions);
+    const order = await instance.orders.create({
+      amount: totalAmountPaise,
+      currency: "INR",
+      receipt: shortReceipt,
+    });
+
     return {
       order,
       platformFee: platformFeePaise / 100,
       labPayout: labPayoutPaise / 100,
-      split_mode: "INSTANT_SPLIT",
+      split_mode: "SCHEDULED_MIDNIGHT",
     };
   } catch (err) {
-    console.warn("⚠️ Instant Order Split Failed. Attempting Fallback Option (Standard Order + Post-Payment Transfer)...", err?.error || err?.message);
+    console.warn("⚠️ Standard Order Creation Failed:", err?.error || err?.message);
 
-    try {
-      // Fallback Option 1: Standard Order Creation (No blocking checkout for patient)
-      const standardOrder = await instance.orders.create({
-        amount: totalAmountPaise,
-        currency: "INR",
-        receipt: shortReceipt,
-      });
-
+    if (
+      process.env.NODE_ENV !== "production" ||
+      err?.statusCode === 401 ||
+      err?.error?.code === "BAD_REQUEST_ERROR" ||
+      !process.env.RAZORPAY_KEY_ID
+    ) {
+      console.log("ℹ️ Dev Fallback: Created mock order for checkout.");
       return {
-        order: standardOrder,
+        order: {
+          id: `order_mock_${Date.now()}`,
+          amount: totalAmountPaise,
+          currency: "INR",
+        },
         platformFee: platformFeePaise / 100,
         labPayout: labPayoutPaise / 100,
-        split_mode: "POST_PAYMENT_FALLBACK",
+        is_mock: true,
+        split_mode: "MOCK_FALLBACK",
       };
-    } catch (fallbackErr) {
-      console.warn("⚠️ Standard Order Fallback Failed:", fallbackErr?.error || fallbackErr?.message);
-
-      if (
-        process.env.NODE_ENV !== "production" ||
-        fallbackErr?.statusCode === 401 ||
-        fallbackErr?.error?.code === "BAD_REQUEST_ERROR"
-      ) {
-        console.log("ℹ️ Dev Fallback: Created mock split order.");
-        return {
-          order: {
-            id: `order_mock_split_${Date.now()}`,
-            amount: totalAmountPaise,
-            currency: "INR",
-          },
-          platformFee: platformFeePaise / 100,
-          labPayout: labPayoutPaise / 100,
-          is_mock: true,
-          split_mode: "MOCK_FALLBACK",
-        };
-      }
-      throw fallbackErr;
     }
+    throw err;
   }
 };
 
+// Backward-compatible alias
+exports.createSplitOrder = exports.createStandardOrder;
+
 /**
- * Fallback Mechanism: Execute Post-Payment Transfer if instant order split was bypassed or failed
+ * Execute Post-Appointment Payout Transfer to Lab Linked Account (Triggered by Midnight Cron or Admin)
  */
-exports.executePostPaymentTransfer = async ({ paymentId, labAccountId, amount, commissionPercentage = 10 }) => {
+exports.executeLabTransfer = async ({ paymentId, labAccountId, amount, commissionPercentage = 10 }) => {
   const instance = getRazorpayInstance();
   const totalAmountPaise = Math.round(amount * 100);
   const platformFeePaise = Math.round(totalAmountPaise * (commissionPercentage / 100));
@@ -169,11 +142,11 @@ exports.executePostPaymentTransfer = async ({ paymentId, labAccountId, amount, c
 
   const isMock = String(paymentId).startsWith("pay_mock_") || String(paymentId).startsWith("pay_sim_") || String(paymentId).startsWith("order_mock_");
 
-  if (isMock || process.env.NODE_ENV !== "production") {
-    console.log(`ℹ️ Dev Fallback: Executed post-payment transfer of ₹${labPayoutPaise / 100} to lab ${labAccountId}`);
+  if (isMock || process.env.NODE_ENV !== "production" || !process.env.RAZORPAY_KEY_ID) {
+    console.log(`ℹ️ Dev Payout Execution: Transferred ₹${labPayoutPaise / 100} to lab account ${labAccountId}`);
     return {
       success: true,
-      transfer_id: `trf_post_mock_${Date.now()}`,
+      transfer_id: `trf_batch_mock_${Date.now()}`,
       labPayout: labPayoutPaise / 100,
       platformFee: platformFeePaise / 100,
       status: "processed",
@@ -201,7 +174,7 @@ exports.executePostPaymentTransfer = async ({ paymentId, labAccountId, amount, c
       status: "processed",
     };
   } catch (err) {
-    console.error("⚠️ Post-Payment Transfer Fallback Failed:", err);
+    console.error("⚠️ Midnight Batch Payout Transfer Failed:", err?.error || err?.message || err);
     return {
       success: false,
       error: err?.error?.description || err?.message || "Transfer failed",
@@ -212,8 +185,12 @@ exports.executePostPaymentTransfer = async ({ paymentId, labAccountId, amount, c
   }
 };
 
+// Backward-compatible alias
+exports.executePostPaymentTransfer = exports.executeLabTransfer;
+
 /**
- * Refund a Payment and automatically reverse transfers from Linked Account
+ * Refund a Payment directly from Platform Account back to patient
+ * (No transfer reversal needed since funds were held in Platform Account)
  */
 exports.processRefund = async ({ paymentId, amount }) => {
   const instance = getRazorpayInstance();
@@ -221,7 +198,7 @@ exports.processRefund = async ({ paymentId, amount }) => {
 
   const isMock = String(paymentId).startsWith("pay_mock_") || String(paymentId).startsWith("pay_sim_") || String(paymentId).startsWith("order_mock_");
 
-  if (isMock || process.env.NODE_ENV !== "production") {
+  if (isMock || process.env.NODE_ENV !== "production" || !process.env.RAZORPAY_KEY_ID) {
     console.log(`ℹ️ Dev Fallback: Simulated refund of ₹${amount} for payment ${paymentId}`);
     return {
       success: true,
@@ -236,7 +213,6 @@ exports.processRefund = async ({ paymentId, amount }) => {
     const refund = await instance.payments.refund(paymentId, {
       amount: amountPaise,
       speed: "normal",
-      reverse_all_transfers: 1, // Automatically reverses lab transfer for this specific payment
     });
 
     return {

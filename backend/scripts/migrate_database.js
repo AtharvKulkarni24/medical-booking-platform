@@ -27,9 +27,12 @@ async function applyMigrations() {
       ADD COLUMN IF NOT EXISTS lab_payout_amount DECIMAL(10, 2) DEFAULT 0.00,
       ADD COLUMN IF NOT EXISTS refund_id VARCHAR(255),
       ADD COLUMN IF NOT EXISTS refund_status VARCHAR(50) DEFAULT 'NOT_REFUNDED',
-      ADD COLUMN IF NOT EXISTS refund_amount DECIMAL(10, 2) DEFAULT 0.00;
+      ADD COLUMN IF NOT EXISTS refund_amount DECIMAL(10, 2) DEFAULT 0.00,
+      ADD COLUMN IF NOT EXISTS payout_status VARCHAR(50) DEFAULT 'PENDING',
+      ADD COLUMN IF NOT EXISTS payout_date TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS payout_error TEXT;
     `);
-    console.log("✅ Updated 'payments' table with Razorpay Route Transfer & Refund columns.");
+    console.log("✅ Updated 'payments' table with Razorpay Route Transfer, Refund & Midnight Payout columns.");
 
     console.log("🟢 All database schema changes applied live to PostgreSQL successfully!");
   } catch (error) {

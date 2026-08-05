@@ -33,4 +33,7 @@ router.get("/roster", authorizeRole("lab"), appointmentController.getLabDailyRos
 // Mark appointment as completed and attach report
 router.patch("/:id/complete", authorizeRole("lab"), appointmentController.completeAppointment);
 
+// Trigger manual batch payout (for testing or admin operations)
+router.post("/trigger-payout", appointmentController.triggerManualPayout);
+
 module.exports = router;

@@ -969,6 +969,8 @@ exports.getRazorpayPayoutStatus = async (req, res) => {
          COALESCE(SUM(p.amount), 0) AS total_gross_volume,
          COALESCE(SUM(p.platform_fee), 0) AS total_platform_fee,
          COALESCE(SUM(p.lab_payout_amount), 0) AS total_net_payout,
+         COALESCE(SUM(CASE WHEN p.payout_status = 'PENDING' THEN p.lab_payout_amount ELSE 0 END), 0) AS pending_midnight_payout,
+         COALESCE(SUM(CASE WHEN p.payout_status = 'COMPLETED' THEN p.lab_payout_amount ELSE 0 END), 0) AS completed_midnight_payout,
          COUNT(p.payment_id) AS total_paid_transactions
        FROM appointments a
        JOIN payments p ON a.appointment_id = p.appointment_id
@@ -999,6 +1001,8 @@ exports.getRazorpayPayoutStatus = async (req, res) => {
           total_gross_volume: parseFloat(earnings.total_gross_volume),
           total_platform_fee: parseFloat(earnings.total_platform_fee),
           total_net_payout: parseFloat(earnings.total_net_payout),
+          pending_midnight_payout: parseFloat(earnings.pending_midnight_payout),
+          completed_midnight_payout: parseFloat(earnings.completed_midnight_payout),
           total_transactions: parseInt(earnings.total_paid_transactions, 10),
         },
       },

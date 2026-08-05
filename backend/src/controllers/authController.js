@@ -99,7 +99,7 @@ exports.loginPatient = async (req, res) => {
     if (patientData.rows.length === 0) {
       return res
         .status(400)
-        .json({ success: false, error: "Invalid credentials." });
+        .json({ success: false, error: "No patient account found with this email. Please register first." });
     }
 
     const patient = patientData.rows[0];
@@ -244,7 +244,7 @@ exports.loginLab = async (req, res) => {
     if (labData.rows.length === 0) {
       return res
         .status(400)
-        .json({ success: false, error: "Invalid credentials." });
+        .json({ success: false, error: "No diagnostic center account found with this email. Please register first." });
     }
 
     const lab = labData.rows[0];

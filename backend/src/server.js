@@ -6,6 +6,7 @@ const cookieParser = require("cookie-parser");
 // --- Import Database & Services ---
 const db = require("./config/db");
 const { initRedis } = require("./services/redisClient");
+const { initPayoutCron } = require("./services/payoutCronService");
 
 // --- Import Routes ---
 const authRoutes = require("./routes/authRoutes");
@@ -81,6 +82,7 @@ if (require.main === module) {
 
       app.listen(PORT, () => {
         console.log(`🚀 Server is running securely on http://localhost:${PORT}`);
+        initPayoutCron();
       });
     } catch (error) {
       console.error("🔴 Fatal Error during startup. Server halted:", error.message);

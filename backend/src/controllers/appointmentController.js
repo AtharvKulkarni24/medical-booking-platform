@@ -211,9 +211,9 @@ exports.verifyAndBookAppointment = async (req, res) => {
 
     const newAppointmentId = appointmentResult.rows[0].appointment_id;
 
-    // 4. Log the split transaction & execute post-payment transfer fallback if needed
+    // 4. Log payment entry with PENDING payout status (for scheduled midnight batch transfer)
     const labQuery = await client.query(
-      `SELECT razorpay_account_id, platform_commission_percentage FROM labs WHERE lab_id = $1`,
+      `SELECT platform_commission_percentage FROM labs WHERE lab_id = $1`,
       [lab_id]
     );
     const labData = labQuery.rows[0] || {};
@@ -221,34 +221,12 @@ exports.verifyAndBookAppointment = async (req, res) => {
     const platformFee = Math.round(amountPaid * (commPercent / 100) * 100) / 100;
     const labPayout = Math.round((amountPaid - platformFee) * 100) / 100;
 
-    let transferId = `trf_route_${Date.now()}`;
-    let paymentStatus = "Success";
-
-    if (labData.razorpay_account_id) {
-      try {
-        const postTransfer = await executePostPaymentTransfer({
-          paymentId: razorpay_payment_id || razorpay_order_id,
-          labAccountId: labData.razorpay_account_id,
-          amount: amountPaid,
-          commissionPercentage: commPercent,
-        });
-
-        if (postTransfer.success) {
-          transferId = postTransfer.transfer_id;
-        } else if (postTransfer.status === "TRANSFER_FAILED") {
-          paymentStatus = "TRANSFER_FAILED";
-        }
-      } catch (postErr) {
-        console.warn("Post-payment transfer fallback warning:", postErr);
-      }
-    }
-
     await client.query(
       `INSERT INTO payments 
-        (appointment_id, amount, gateway_provider, gateway_order_id, gateway_payment_id, razorpay_transfer_id, platform_fee, lab_payout_amount, status, transaction_date)
+        (appointment_id, amount, gateway_provider, gateway_order_id, gateway_payment_id, platform_fee, lab_payout_amount, status, payout_status, transaction_date)
        VALUES 
-        ($1, $2, 'Razorpay', $3, $4, $5, $6, $7, $8, NOW())`,
-      [newAppointmentId, amountPaid, razorpay_order_id, razorpay_payment_id, transferId, platformFee, labPayout, paymentStatus]
+        ($1, $2, 'Razorpay', $3, $4, $5, $6, 'Success', 'PENDING', NOW())`,
+      [newAppointmentId, amountPaid, razorpay_order_id, razorpay_payment_id, platformFee, labPayout]
     );
 
     await client.query("COMMIT");
@@ -403,7 +381,8 @@ exports.cancelAppointment = async (req, res) => {
            status = 'Refunded',
            refund_id = $1,
            refund_status = 'PROCESSED',
-           refund_amount = $2
+           refund_amount = $2,
+           payout_status = 'CANCELLED_REFUNDED'
          WHERE appointment_id = $3`,
         [refundDetails?.refund_id || `rfnd_sys_${Date.now()}`, pay.amount, id]
       );
@@ -542,5 +521,26 @@ exports.completeAppointment = async (req, res) => {
         success: false,
         error: "Server error while completing appointment.",
       });
+  }
+};
+
+// ==========================================
+// MANUAL MIDNIGHT PAYOUT TRIGGER
+// ==========================================
+exports.triggerManualPayout = async (req, res) => {
+  try {
+    const { processMidnightPayoutsManually } = require("../services/payoutCronService");
+    const result = await processMidnightPayoutsManually();
+    res.status(200).json({
+      success: true,
+      message: "Midnight payout batch execution completed.",
+      summary: result,
+    });
+  } catch (error) {
+    console.error("Manual Payout Trigger Error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to execute manual payout.",
+    });
   }
 };
