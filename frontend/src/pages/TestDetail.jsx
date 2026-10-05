@@ -429,6 +429,11 @@ export default function TestDetail() {
                 <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
                   <span>📍</span> {labDetails.address_text}
                 </p>
+                {labDetails.is_demo && (
+                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
+                    Demo data only. This is not a real diagnostic center; booking and payment are unavailable.
+                  </p>
+                )}
               </div>
 
               <div className="bg-blue-50/80 px-6 py-4 rounded-2xl border border-blue-100 text-center min-w-[140px]">
@@ -514,7 +519,7 @@ export default function TestDetail() {
 
                     <button
                       onClick={() => handleSlotClick(slot)}
-                      disabled={isFull || isProcessing}
+                      disabled={isFull || isProcessing || labDetails?.is_demo}
                       className={`mt-4 w-full py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-2 ${isFull
                           ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
@@ -527,6 +532,8 @@ export default function TestDetail() {
                         </>
                       ) : isFull ? (
                         'Slot Unavailable'
+                      ) : labDetails?.is_demo ? (
+                        'Demo listing — booking disabled'
                       ) : (
                         'Book & Pay Online →'
                       )}

@@ -36,6 +36,7 @@ exports.searchLabs = async (req, res) => {
             SELECT
                 l.lab_id,
                 l.name AS lab_name,
+                (l.name LIKE 'DEMO DATA - %') AS is_demo,
                 l.address_text,
                 ST_Y(l.location_coordinates::geometry) AS latitude,
                 ST_X(l.location_coordinates::geometry) AS longitude,
@@ -190,6 +191,7 @@ exports.getLabTestDetails = async (req, res) => {
             SELECT
                 l.lab_id,
                 l.name AS lab_name,
+                (l.name LIKE 'DEMO DATA - %') AS is_demo,
                 l.address_text,
                 ST_Y(l.location_coordinates::geometry) AS latitude,
                 ST_X(l.location_coordinates::geometry) AS longitude,
@@ -326,6 +328,7 @@ exports.searchLabDirectory = async (req, res) => {
             SELECT
                 lab_id,
                 name AS lab_name,
+                (name LIKE 'DEMO DATA - %') AS is_demo,
                 address_text,
                 average_rating,
                 ROUND(
@@ -374,6 +377,7 @@ exports.getSingleLabDetails = async (req, res) => {
             SELECT 
                 lab_id, 
                 name AS lab_name, 
+                name LIKE 'DEMO DATA - %' AS is_demo,
                 address_text, 
                 ST_Y(location_coordinates::geometry) AS latitude,
                 ST_X(location_coordinates::geometry) AS longitude,

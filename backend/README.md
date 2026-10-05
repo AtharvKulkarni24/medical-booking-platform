@@ -66,6 +66,23 @@ npm run dev
 npm run db:init
 ```
 
+### Seed nearby demo listings
+
+After the master test catalog has been seeded, you can add clearly labeled,
+fictional Pune listings for search and test-detail UI checks:
+
+```bash
+ALLOW_PUBLIC_DEMO_SEED=true DEMO_TARGET_DATABASE=your_database_name npm run db:seed:demo
+```
+
+The script is idempotent and defaults to coordinates near Pune
+(18.456153, 73.844349). Override them with `DEMO_CENTER_LAT` and
+`DEMO_CENTER_LNG` if needed. `DEMO_TARGET_DATABASE` must match the connected
+database name exactly. It creates demo labs, test listings, and weekly
+slots only; it does not create accounts, appointments, or payments. The demo
+listings are visible in the live application and are not real providers.
+Do not use the schema initializer to rerun or reset an existing database.
+
 The server starts on port 5000 by default unless PORT is overridden.
 
 ## API Overview

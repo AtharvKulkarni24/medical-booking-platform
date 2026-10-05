@@ -192,8 +192,8 @@ export default function SearchLabs() {
                         <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition">
                           {lab.lab_name}
                         </h3>
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 whitespace-nowrap">
-                          Verified
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${lab.is_demo ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-700'}`}>
+                          {lab.is_demo ? 'Demo data' : 'Verified'}
                         </span>
                       </div>
 

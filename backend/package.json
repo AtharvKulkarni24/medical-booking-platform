@@ -7,7 +7,8 @@
     "dev": "nodemon src/server.js",
     "db:init": "node src/init_db.js",
     "db:migrate": "node scripts/migrate_database.js",
-    "db:seed": "node scripts/seed_test_data.js"
+    "db:seed": "node scripts/seed_test_data.js",
+    "db:seed:demo": "node scripts/seed_demo_data.js"
   },
   "keywords": [],
   "author": "",

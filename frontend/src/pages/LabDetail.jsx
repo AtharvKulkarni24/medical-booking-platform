@@ -79,8 +79,8 @@ export default function LabDetail() {
               <div>
                 <div className="flex items-center gap-3 mb-3">
                   <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">{lab.lab_name}</h1>
-                  <span className="bg-blue-50 text-blue-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-blue-100">
-                    ✓ Verified Lab
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider border ${lab.is_demo ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-100'}`}>
+                    {lab.is_demo ? 'Demo data only' : '✓ Verified Lab'}
                   </span>
                 </div>
 
