@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -27,16 +27,59 @@ export default function Home() {
   const [activeTest, setActiveTest] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
+  const [categories, setCategories] = useState([])
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const searchBoxRef = useRef(null)
+
   useEffect(() => {
     if (!authLoading && user && user.role === 'lab') {
       navigate('/labs', { replace: true })
     }
   }, [user, authLoading, navigate])
 
+  useEffect(() => {
+    fetch('http://localhost:5000/api/search/categories')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setCategories(data.categories || [])
+      })
+      .catch(err => console.error("Error fetching categories:", err))
+  }, [])
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const handleQueryChange = (val) => {
+    setSearchQuery(val)
+    if (val.trim().length >= 1) {
+      fetch(`http://localhost:5000/api/search/suggestions?q=${encodeURIComponent(val.trim())}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setSuggestions(data.suggestions || [])
+            setShowSuggestions(true)
+          }
+        })
+        .catch(err => console.error(err))
+    } else {
+      setSuggestions([])
+      setShowSuggestions(false)
+    }
+  }
+
   // 1. Click on a specific TEST card -> search based on TEST AND LOCATION
   const handleTestClick = (testName) => {
     setIsLocating(true)
     setActiveTest(testName)
+    setShowSuggestions(false)
 
     if (!navigator.geolocation) {
       setIsLocating(false)
@@ -64,6 +107,7 @@ export default function Home() {
     e.preventDefault()
     setIsLocating(true)
     setActiveTest('Nearby Labs')
+    setShowSuggestions(false)
     const query = searchQuery.trim()
 
     if (!navigator.geolocation) {
@@ -141,25 +185,72 @@ export default function Home() {
           </p>
 
           {/* Search Box */}
-          <form onSubmit={handleDirectSearchSubmit} className="max-w-2xl mx-auto glass-card p-3 rounded-3xl shadow-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-3">
-            <div className="flex-1 flex items-center gap-3 px-4 py-2 w-full">
-              <span className="text-xl">🔍</span>
-              <input 
-                type="text"
-                placeholder="Search diagnostic center name or location..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border-none text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-base"
-              />
+          <div className="relative max-w-2xl mx-auto z-30" ref={searchBoxRef}>
+            <form onSubmit={handleDirectSearchSubmit} className="glass-card p-3 rounded-3xl shadow-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-3">
+              <div className="flex-1 flex items-center gap-3 px-4 py-2 w-full">
+                <span className="text-xl">🔍</span>
+                <input 
+                  type="text"
+                  placeholder="Search test e.g. CBC, Ultrasound, Sugar, Thyroid..."
+                  value={searchQuery}
+                  onChange={(e) => handleQueryChange(e.target.value)}
+                  onFocus={() => searchQuery.trim() && setShowSuggestions(true)}
+                  className="w-full bg-transparent border-none text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-base"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-7 py-3.5 rounded-2xl shadow-md transition duration-200 cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap text-sm"
+              >
+                <span>Find Labs</span>
+                <span className="text-lg">➔</span>
+              </button>
+            </form>
+
+            {/* AUTO-SUGGEST DROPDOWN PANEL */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200/90 text-left overflow-hidden z-40 animate-fade-in-up">
+                <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Suggested Tests & Categories
+                </div>
+                <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                  {suggestions.map((item, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => handleTestClick(item.label)}
+                      className="w-full px-5 py-3 hover:bg-blue-50/80 flex items-center justify-between transition cursor-pointer text-slate-800 hover:text-blue-600 text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">{item.category_icon || '🧪'}</span>
+                        <span className="font-bold text-sm">{item.label}</span>
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                        {item.type === 'category' ? 'Category' : 'Test'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CATEGORY FILTER CHIPS */}
+          {categories.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-8 max-w-4xl mx-auto">
+              <span className="text-xs font-extrabold text-slate-400 uppercase tracking-widest mr-1">Categories:</span>
+              {categories.map(cat => (
+                <button
+                  key={cat.category_id}
+                  onClick={() => handleTestClick(cat.name)}
+                  className="px-3.5 py-1.5 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-600 border border-slate-200/90 text-xs font-bold transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  <span>{cat.icon}</span>
+                  <span>{cat.name}</span>
+                </button>
+              ))}
             </div>
-            <button
-              type="submit"
-              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-7 py-3.5 rounded-2xl shadow-md transition duration-200 cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap text-sm"
-            >
-              <span>Find Labs</span>
-              <span className="text-lg">➔</span>
-            </button>
-          </form>
+          )}
 
         </div>
       </section>

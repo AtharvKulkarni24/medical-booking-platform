@@ -696,7 +696,16 @@ exports.createTest = async (req, res) => {
       });
     }
 
-    const { test_name, description, price } = req.body;
+    const { 
+      test_name, 
+      description, 
+      price,
+      category_id,
+      master_test_id,
+      sample_type,
+      fasting_required,
+      turnaround_hours
+    } = req.body;
 
     if (!test_name || !price) {
       return res.status(400).json({
@@ -718,16 +727,47 @@ exports.createTest = async (req, res) => {
     }
 
     const result = await db.query(
-      `INSERT INTO tests (lab_id, test_name, description, price, is_verified) 
-       VALUES ($1, $2, $3, $4, FALSE) 
-       RETURNING test_id, test_name, description, price, is_verified`,
-      [labId, test_name, description, price],
+      `INSERT INTO tests (
+         lab_id, 
+         test_name, 
+         description, 
+         price, 
+         category_id, 
+         master_test_id, 
+         sample_type, 
+         fasting_required, 
+         turnaround_hours, 
+         is_verified
+       ) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE) 
+       RETURNING 
+         test_id, 
+         test_name, 
+         description, 
+         price, 
+         category_id, 
+         master_test_id, 
+         sample_type, 
+         fasting_required, 
+         turnaround_hours, 
+         is_verified`,
+      [
+        labId, 
+        test_name, 
+        description, 
+        price, 
+        category_id ? parseInt(category_id) : null,
+        master_test_id ? parseInt(master_test_id) : null,
+        sample_type || 'Blood',
+        Boolean(fasting_required),
+        turnaround_hours ? parseInt(turnaround_hours) : 24
+      ],
     );
 
     res.status(201).json({
       success: true,
       message: "Test added to catalog successfully. Pending verification.",
-      test: result.rows,
+      test: result.rows[0],
     });
   } catch (error) {
     console.error("Create Test Error:", error);
@@ -744,10 +784,23 @@ exports.getAllTests = async (req, res) => {
     const labId = req.user.id;
 
     const result = await db.query(
-      `SELECT test_id, test_name, description, price, is_verified 
-       FROM tests 
-       WHERE lab_id = $1 
-       ORDER BY test_name ASC`,
+      `SELECT 
+         t.test_id, 
+         t.test_name, 
+         t.description, 
+         t.price, 
+         t.is_verified,
+         t.category_id,
+         t.master_test_id,
+         t.sample_type,
+         t.fasting_required,
+         t.turnaround_hours,
+         tc.name AS category_name,
+         tc.icon AS category_icon
+       FROM tests t
+       LEFT JOIN test_categories tc ON t.category_id = tc.category_id
+       WHERE t.lab_id = $1 
+       ORDER BY t.test_name ASC`,
       [labId],
     );
 
@@ -772,9 +825,22 @@ exports.getTestById = async (req, res) => {
     const { id } = req.params;
 
     const result = await db.query(
-      `SELECT test_id, test_name, description, price, is_verified 
-       FROM tests 
-       WHERE test_id = $1 AND lab_id = $2`,
+      `SELECT 
+         t.test_id, 
+         t.test_name, 
+         t.description, 
+         t.price, 
+         t.is_verified,
+         t.category_id,
+         t.master_test_id,
+         t.sample_type,
+         t.fasting_required,
+         t.turnaround_hours,
+         tc.name AS category_name,
+         tc.icon AS category_icon
+       FROM tests t
+       LEFT JOIN test_categories tc ON t.category_id = tc.category_id
+       WHERE t.test_id = $1 AND t.lab_id = $2`,
       [id, labId],
     );
 
@@ -807,7 +873,16 @@ exports.updateTest = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { test_name, description, price } = req.body;
+    const { 
+      test_name, 
+      description, 
+      price,
+      category_id,
+      master_test_id,
+      sample_type,
+      fasting_required,
+      turnaround_hours
+    } = req.body;
 
     const result = await db.query(
       `UPDATE tests 
@@ -815,10 +890,36 @@ exports.updateTest = async (req, res) => {
          test_name = COALESCE($1, test_name), 
          description = COALESCE($2, description), 
          price = COALESCE($3, price),
+         category_id = COALESCE($4, category_id),
+         master_test_id = COALESCE($5, master_test_id),
+         sample_type = COALESCE($6, sample_type),
+         fasting_required = COALESCE($7, fasting_required),
+         turnaround_hours = COALESCE($8, turnaround_hours),
          is_verified = FALSE
-       WHERE test_id = $4 AND lab_id = $5 
-       RETURNING test_id, test_name, description, price, is_verified;`,
-      [test_name, description, price, id, labId],
+       WHERE test_id = $9 AND lab_id = $10 
+       RETURNING 
+         test_id, 
+         test_name, 
+         description, 
+         price, 
+         category_id, 
+         master_test_id, 
+         sample_type, 
+         fasting_required, 
+         turnaround_hours, 
+         is_verified;`,
+      [
+        test_name || null,
+        description || null,
+        price || null,
+        category_id ? parseInt(category_id) : null,
+        master_test_id ? parseInt(master_test_id) : null,
+        sample_type || null,
+        fasting_required !== undefined ? Boolean(fasting_required) : null,
+        turnaround_hours ? parseInt(turnaround_hours) : null,
+        id,
+        labId
+      ]
     );
 
     if (result.rows.length === 0) {
@@ -880,7 +981,15 @@ exports.deleteTest = async (req, res) => {
 exports.onboardRazorpayAccount = async (req, res) => {
   try {
     const labId = req.user.id;
-    const { bank_account_number, bank_ifsc, bank_account_holder_name, business_entity_type = 'individual' } = req.body;
+    const { 
+      bank_account_number, 
+      bank_ifsc, 
+      bank_account_holder_name, 
+      business_entity_type = 'individual',
+      city,
+      state,
+      pincode 
+    } = req.body;
 
     if (!bank_account_number || !bank_ifsc || !bank_account_holder_name) {
       return res.status(400).json({
@@ -911,6 +1020,9 @@ exports.onboardRazorpayAccount = async (req, res) => {
       ifsc: bank_ifsc,
       beneficiary_name: bank_account_holder_name,
       business_type: business_entity_type,
+      city,
+      state,
+      pincode,
     });
 
     // 3. Save Linked Account details in DB & mark lab as VERIFIED
@@ -923,9 +1035,12 @@ exports.onboardRazorpayAccount = async (req, res) => {
          bank_ifsc = $4,
          bank_account_holder_name = $5,
          business_entity_type = $6,
+         city = COALESCE($7, city),
+         state = COALESCE($8, state),
+         pincode = COALESCE($9, pincode),
          is_verified = TRUE
-       WHERE lab_id = $7
-       RETURNING lab_id, is_verified, razorpay_account_id, razorpay_account_status, bank_account_number, bank_ifsc, bank_account_holder_name, business_entity_type;`,
+       WHERE lab_id = $10
+       RETURNING lab_id, is_verified, razorpay_account_id, razorpay_account_status, bank_account_number, bank_ifsc, bank_account_holder_name, business_entity_type, city, state, pincode;`,
       [
         accountResult.account_id,
         accountResult.status || "ACTIVATED",
@@ -933,6 +1048,9 @@ exports.onboardRazorpayAccount = async (req, res) => {
         bank_ifsc,
         bank_account_holder_name,
         business_entity_type,
+        city || null,
+        state || null,
+        pincode || null,
         labId,
       ]
     );
@@ -964,6 +1082,9 @@ exports.getRazorpayPayoutStatus = async (req, res) => {
          bank_ifsc,
          bank_account_holder_name,
          business_entity_type,
+         city,
+         state,
+         pincode,
          platform_commission_percentage
        FROM labs
        WHERE lab_id = $1`,
@@ -1009,6 +1130,9 @@ exports.getRazorpayPayoutStatus = async (req, res) => {
         bank_ifsc: labData.bank_ifsc,
         bank_account_holder_name: labData.bank_account_holder_name,
         business_entity_type: labData.business_entity_type,
+        city: labData.city,
+        state: labData.state,
+        pincode: labData.pincode,
         platform_commission_percentage: labData.platform_commission_percentage || 10.0,
         earnings: {
           total_gross_volume: parseFloat(earnings.total_gross_volume),

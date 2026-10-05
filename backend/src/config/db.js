@@ -1,13 +1,11 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
-// Create a new pool using the Render connection string
+
+// Create a new pool using the connection string
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
-  // Optional: helps manage dropped connections faster
+  ssl: false,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
 });

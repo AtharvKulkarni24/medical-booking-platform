@@ -19,6 +19,9 @@ exports.createLinkedAccount = async (labData) => {
     ifsc,
     beneficiary_name,
     business_type = "individual",
+    city,
+    state,
+    pincode,
   } = labData;
 
   const payload = {
@@ -33,9 +36,9 @@ exports.createLinkedAccount = async (labData) => {
       addresses: {
         registered: {
           street1: labData.address_text || "Lab Registered Address",
-          city: "Mumbai",
-          state: "Maharashtra",
-          postal_code: "400001",
+          city: city || "Mumbai",
+          state: state || "Maharashtra",
+          postal_code: pincode || "400001",
           country: "IN",
         },
       },

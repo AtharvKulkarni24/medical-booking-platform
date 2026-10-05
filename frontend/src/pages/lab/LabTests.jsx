@@ -1,27 +1,28 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 
-const popularTests = [
-  { id: 1, name: 'Blood Test', description: 'Evaluates overall health and detects a wide range of disorders.', icon: '🩸' },
-  { id: 2, name: 'Sonography Test', description: 'High-resolution ultrasound imaging for internal organ screening.', icon: '🩺' },
-  { id: 3, name: 'Kidney Test', description: 'Evaluates how well your kidneys are filtering waste from your blood.', icon: '🫘' },
-  { id: 4, name: 'Liver Test', description: 'Measures proteins, liver enzymes, and bilirubin in the blood.', icon: '🧪' },
-  { id: 5, name: 'Sugar Test', description: 'Measures blood glucose levels to screen for and monitor diabetes.', icon: '📏' },
-  { id: 6, name: 'Vitamin Test', description: 'Checks for essential vitamin deficiencies affecting bone and nerve health.', icon: '☀️' },
-  { id: 7, name: 'Urine Test', description: 'Routine analysis to detect urinary tract infections and kidney issues.', icon: '💧' },
-  { id: 8, name: 'Thyroid Profile', description: 'Checks T3, T4 and TSH levels to evaluate thyroid gland health.', icon: '🦋' }
-];
-
 export default function LabTests() {
   const navigate = useNavigate()
   
   const [tests, setTests] = useState([])
+  const [categories, setCategories] = useState([])
+  const [masterTests, setMasterTests] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
   const [editModalData, setEditModalData] = useState(null)
   const [addModalOpen, setAddModalOpen] = useState(false)
-  const [addForm, setAddForm] = useState({ test_name: '', price: '', description: '' })
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [addForm, setAddForm] = useState({
+    test_name: '',
+    price: '',
+    description: '',
+    category_id: '',
+    master_test_id: '',
+    sample_type: 'Blood',
+    fasting_required: false,
+    turnaround_hours: 24
+  })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -30,7 +31,7 @@ export default function LabTests() {
   const [infoModal, setInfoModal] = useState(null) 
 
   useEffect(() => {
-    const fetchTests = async () => {
+    const fetchData = async () => {
       const token = localStorage.getItem('accessToken')
       const userString = localStorage.getItem('user')
       const user = userString ? JSON.parse(userString) : null
@@ -41,14 +42,21 @@ export default function LabTests() {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/api/labs/tests', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const result = await response.json()
+        const [testsRes, catRes, masterRes] = await Promise.all([
+          fetch('http://localhost:5000/api/labs/tests', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('http://localhost:5000/api/search/categories'),
+          fetch('http://localhost:5000/api/search/master-tests')
+        ])
 
-        if (!response.ok) throw new Error(result.error || result.message || 'Failed to fetch tests.')
+        const testsData = await testsRes.json()
+        const catData = await catRes.json()
+        const masterData = await masterRes.json()
 
-        setTests(result.tests || [])
+        if (!testsRes.ok) throw new Error(testsData.error || testsData.message || 'Failed to fetch tests.')
+
+        setTests(testsData.tests || [])
+        if (catData.success) setCategories(catData.categories || [])
+        if (masterData.success) setMasterTests(masterData.master_tests || [])
       } catch (err) {
         setError(err.message)
       } finally {
@@ -56,8 +64,34 @@ export default function LabTests() {
       }
     }
 
-    fetchTests()
+    fetchData()
   }, [navigate])
+
+  const handleTemplateSelect = (templateId) => {
+    setSelectedTemplateId(templateId)
+    if (!templateId || templateId === 'custom') {
+      setAddForm(prev => ({
+        ...prev,
+        master_test_id: '',
+        category_id: categories[0]?.category_id || ''
+      }))
+      return
+    }
+
+    const tpl = masterTests.find(m => m.master_test_id.toString() === templateId.toString())
+    if (tpl) {
+      setAddForm({
+        test_name: tpl.test_name,
+        price: addForm.price || '',
+        description: tpl.description || '',
+        category_id: tpl.category_id || '',
+        master_test_id: tpl.master_test_id,
+        sample_type: tpl.sample_type || 'Blood',
+        fasting_required: Boolean(tpl.fasting_required),
+        turnaround_hours: tpl.turnaround_hours || 24
+      })
+    }
+  }
 
   const triggerDelete = (testId, testName) => {
     setDeleteConfirmData({ id: testId, name: testName })
@@ -110,17 +144,13 @@ export default function LabTests() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          test_name: editModalData.test_name,
-          description: editModalData.description,
-          price: editModalData.price
-        })
+        body: JSON.stringify(editModalData)
       })
       
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || result.message || 'Failed to update test.')
 
-      const updatedTest = Array.isArray(result.test) ? result.test[0] : result.test;
+      const updatedTest = result.test;
 
       setTests(prev => prev.map(t => t.test_id === editModalData.test_id ? updatedTest : t))
       setEditModalData(null)
@@ -156,11 +186,21 @@ export default function LabTests() {
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || result.message || 'Failed to add test.')
 
-      const newTest = Array.isArray(result.test) ? result.test[0] : result.test;
+      const newTest = result.test;
 
       setTests(prev => [...prev, newTest])
       setAddModalOpen(false)
-      setAddForm({ test_name: '', price: '', description: '' })
+      setSelectedTemplateId('')
+      setAddForm({
+        test_name: '',
+        price: '',
+        description: '',
+        category_id: '',
+        master_test_id: '',
+        sample_type: 'Blood',
+        fasting_required: false,
+        turnaround_hours: 24
+      })
       setInfoModal({
         type: 'success',
         title: 'Test Added',
@@ -243,47 +283,111 @@ export default function LabTests() {
 
       {/* ADD TEST MODAL */}
       {addModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-fade-in-up">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6">Add Diagnostic Test</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl my-8 animate-fade-in-up">
+            <h2 className="text-2xl font-bold text-slate-900 mb-4">Add Diagnostic Test</h2>
             
             {formError && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl text-xs border border-red-100">{formError}</div>}
             
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Select Test Name</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Standard Master Template</label>
                 <select 
-                  value={addForm.test_name} 
-                  onChange={(e) => {
-                    const selectedTest = popularTests.find(t => t.name === e.target.value);
-                    setAddForm({
-                      ...addForm, 
-                      test_name: e.target.value,
-                      description: selectedTest ? selectedTest.description : addForm.description
-                    })
-                  }}
-                  required
+                  value={selectedTemplateId} 
+                  onChange={(e) => handleTemplateSelect(e.target.value)}
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm font-medium text-slate-900"
                 >
-                  <option value="" disabled>Choose diagnostic test...</option>
-                  {popularTests.map(test => (
-                    <option key={test.id} value={test.name}>{test.icon} {test.name}</option>
+                  <option value="">Choose standard test template (Auto-fills info)...</option>
+                  {masterTests.map(mt => (
+                    <option key={mt.master_test_id} value={mt.master_test_id}>
+                      {mt.category_icon || '🧪'} {mt.test_name} ({mt.category_name})
+                    </option>
                   ))}
+                  <option value="custom">✏️ Custom / Unlisted Test</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Test Price (₹)</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Test Name</label>
                 <input 
-                  type="number" 
-                  min="0"
-                  step="0.01"
-                  value={addForm.price} 
-                  onChange={(e) => setAddForm({...addForm, price: e.target.value})}
+                  type="text"
+                  value={addForm.test_name}
+                  onChange={(e) => setAddForm({...addForm, test_name: e.target.value})}
                   required
-                  placeholder="e.g. 499"
+                  placeholder="e.g. Complete Blood Count"
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium text-slate-900"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Category</label>
+                <select 
+                  value={addForm.category_id} 
+                  onChange={(e) => setAddForm({...addForm, category_id: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm font-medium text-slate-900"
+                >
+                  <option value="">Select category...</option>
+                  {categories.map(c => (
+                    <option key={c.category_id} value={c.category_id}>{c.icon} {c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Price (₹)</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    step="0.01"
+                    value={addForm.price} 
+                    onChange={(e) => setAddForm({...addForm, price: e.target.value})}
+                    required
+                    placeholder="499"
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Turnaround (Hrs)</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    value={addForm.turnaround_hours} 
+                    onChange={(e) => setAddForm({...addForm, turnaround_hours: e.target.value})}
+                    placeholder="24"
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 items-center">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Sample Type</label>
+                  <select
+                    value={addForm.sample_type}
+                    onChange={(e) => setAddForm({...addForm, sample_type: e.target.value})}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium text-slate-900"
+                  >
+                    <option value="Blood">🩸 Blood</option>
+                    <option value="Urine">💧 Urine</option>
+                    <option value="Ultrasound">🩺 Ultrasound</option>
+                    <option value="Swab">🧪 Swab</option>
+                    <option value="Imaging">📷 Imaging</option>
+                    <option value="Other">📋 Other</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2 pt-5">
+                  <input 
+                    type="checkbox"
+                    id="add_fasting"
+                    checked={addForm.fasting_required}
+                    onChange={(e) => setAddForm({...addForm, fasting_required: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <label htmlFor="add_fasting" className="text-xs font-bold text-slate-700 cursor-pointer">
+                    🍽️ Fasting Required
+                  </label>
+                </div>
               </div>
 
               <div>
@@ -321,10 +425,9 @@ export default function LabTests() {
 
       {/* EDIT TEST MODAL */}
       {editModalData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-fade-in-up">
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Edit Test Details</h2>
-            <p className="text-slate-500 text-xs mb-6">Price changes apply only to new future bookings.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl my-8 animate-fade-in-up">
+            <h2 className="text-2xl font-bold text-slate-900 mb-4">Edit Diagnostic Test</h2>
             
             {formError && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl text-xs border border-red-100">{formError}</div>}
             
@@ -333,7 +436,7 @@ export default function LabTests() {
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Test Name</label>
                 <input 
                   type="text"
-                  value={editModalData.test_name} 
+                  value={editModalData.test_name}
                   onChange={(e) => setEditModalData({...editModalData, test_name: e.target.value})}
                   required
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium text-slate-900"
@@ -341,23 +444,79 @@ export default function LabTests() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Price (₹)</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  step="0.01"
-                  value={editModalData.price} 
-                  onChange={(e) => setEditModalData({...editModalData, price: e.target.value})}
-                  required
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium text-slate-900"
-                />
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Category</label>
+                <select 
+                  value={editModalData.category_id || ''} 
+                  onChange={(e) => setEditModalData({...editModalData, category_id: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm font-medium text-slate-900"
+                >
+                  <option value="">Select category...</option>
+                  {categories.map(c => (
+                    <option key={c.category_id} value={c.category_id}>{c.icon} {c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Price (₹)</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    step="0.01"
+                    value={editModalData.price} 
+                    onChange={(e) => setEditModalData({...editModalData, price: e.target.value})}
+                    required
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Turnaround (Hrs)</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    value={editModalData.turnaround_hours || 24} 
+                    onChange={(e) => setEditModalData({...editModalData, turnaround_hours: e.target.value})}
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 items-center">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Sample Type</label>
+                  <select
+                    value={editModalData.sample_type || 'Blood'}
+                    onChange={(e) => setEditModalData({...editModalData, sample_type: e.target.value})}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium text-slate-900"
+                  >
+                    <option value="Blood">🩸 Blood</option>
+                    <option value="Urine">💧 Urine</option>
+                    <option value="Ultrasound">🩺 Ultrasound</option>
+                    <option value="Swab">🧪 Swab</option>
+                    <option value="Imaging">📷 Imaging</option>
+                    <option value="Other">📋 Other</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2 pt-5">
+                  <input 
+                    type="checkbox"
+                    id="edit_fasting"
+                    checked={Boolean(editModalData.fasting_required)}
+                    onChange={(e) => setEditModalData({...editModalData, fasting_required: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <label htmlFor="edit_fasting" className="text-xs font-bold text-slate-700 cursor-pointer">
+                    🍽️ Fasting Required
+                  </label>
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Description</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Test Description</label>
                 <textarea 
                   rows="3"
-                  value={editModalData.description} 
+                  value={editModalData.description || ''} 
                   onChange={(e) => setEditModalData({...editModalData, description: e.target.value})}
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-slate-900 resize-none"
                 />
@@ -399,7 +558,17 @@ export default function LabTests() {
             </div>
             <button 
               onClick={() => {
-                setAddForm({ test_name: '', price: '', description: '' })
+                setSelectedTemplateId('')
+                setAddForm({
+                  test_name: '',
+                  price: '',
+                  description: '',
+                  category_id: categories[0]?.category_id || '',
+                  master_test_id: '',
+                  sample_type: 'Blood',
+                  fasting_required: false,
+                  turnaround_hours: 24
+                })
                 setAddModalOpen(true)
                 setFormError('')
               }}
@@ -432,17 +601,36 @@ export default function LabTests() {
               {tests.map(test => (
                 <div key={test.test_id} className="glass-card hover-lift p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition duration-300 flex flex-col justify-between">
                   <div>
-                    <div className="flex justify-between items-start gap-4 mb-3">
+                    <div className="flex justify-between items-start gap-4 mb-2">
                       <h3 className="text-xl font-extrabold text-slate-900">{test.test_name}</h3>
                       <span className="text-2xl font-extrabold text-green-600">₹{test.price}</span>
                     </div>
                     
-                    <div className="mb-4">
-                      <span className={`px-3 py-0.5 rounded-full text-xs font-bold ${
+                    {/* BADGES ROW */}
+                    <div className="flex flex-wrap items-center gap-2 mb-4">
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
                         test.is_verified ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                       }`}>
-                        {test.is_verified ? '✓ Verified Test' : 'Pending Verification'}
+                        {test.is_verified ? '✓ Verified' : 'Pending Verification'}
                       </span>
+
+                      {test.category_name && (
+                        <span className="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-semibold border border-blue-100">
+                          {test.category_icon || '🧪'} {test.category_name}
+                        </span>
+                      )}
+
+                      {test.fasting_required && (
+                        <span className="bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full text-xs font-semibold border border-amber-200">
+                          🍽️ Fasting
+                        </span>
+                      )}
+
+                      {test.sample_type && (
+                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[11px] font-medium">
+                          {test.sample_type}
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-xs text-slate-500 leading-relaxed mb-6 line-clamp-3">

@@ -116,7 +116,7 @@ export default function Search() {
                     <span>{lab.address_text}</span>
                   </p>
 
-                  <div className="flex flex-wrap items-center gap-4 text-xs font-semibold">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
                     <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full flex items-center gap-1">
                       <span>📏</span> {lab.distance_km} km away
                     </span>
@@ -124,6 +124,24 @@ export default function Search() {
                     {lab.average_rating && (
                       <span className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full flex items-center gap-1">
                         <span>⭐</span> {lab.average_rating} / 5.0 Rating
+                      </span>
+                    )}
+
+                    {lab.category_name && (
+                      <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full flex items-center gap-1">
+                        <span>{lab.category_icon || '🧪'}</span> {lab.category_name}
+                      </span>
+                    )}
+
+                    {lab.fasting_required && (
+                      <span className="bg-amber-100/70 text-amber-800 px-2.5 py-1 rounded-full flex items-center gap-1">
+                        <span>🍽️</span> Fasting Required
+                      </span>
+                    )}
+
+                    {lab.turnaround_hours && (
+                      <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-100 flex items-center gap-1">
+                        <span>⏱️</span> {lab.turnaround_hours}h Reports
                       </span>
                     )}
                   </div>

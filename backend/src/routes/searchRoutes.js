@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const searchController = require('../controllers/searchController');
 
+// Catalog & Search Suggestion Routes
+router.get('/categories', searchController.getCategories);
+router.get('/master-tests', searchController.getMasterTests);
+router.get('/suggestions', searchController.getSearchSuggestions);
+
 // 1. Directory search (Must go before dynamic :lab_id)
 router.get('/labs/directory', searchController.searchLabDirectory);
 router.get('/labs', searchController.searchLabs);

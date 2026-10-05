@@ -15,9 +15,12 @@ async function applyMigrations() {
       ADD COLUMN IF NOT EXISTS bank_ifsc VARCHAR(20),
       ADD COLUMN IF NOT EXISTS bank_account_holder_name VARCHAR(255),
       ADD COLUMN IF NOT EXISTS business_entity_type VARCHAR(50) DEFAULT 'individual',
+      ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS state VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS pincode VARCHAR(10),
       ADD COLUMN IF NOT EXISTS platform_commission_percentage DECIMAL(5, 2) DEFAULT 10.00;
     `);
-    console.log("✅ Updated 'labs' table with Razorpay Linked Account columns.");
+    console.log("✅ Updated 'labs' table with Razorpay Linked Account & address columns.");
 
     // 2. Update payments table schema
     await client.query(`

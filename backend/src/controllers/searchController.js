@@ -43,6 +43,11 @@ exports.searchLabs = async (req, res) => {
                 t.test_id,
                 t.test_name,
                 t.price,
+                t.sample_type,
+                t.fasting_required,
+                t.turnaround_hours,
+                tc.name AS category_name,
+                tc.icon AS category_icon,
                 ROUND(
                     (
                         ST_Distance(
@@ -55,10 +60,23 @@ exports.searchLabs = async (req, res) => {
             FROM labs l
             INNER JOIN tests t
                 ON l.lab_id = t.lab_id
+            LEFT JOIN master_tests mt 
+                ON t.master_test_id = mt.master_test_id
+            LEFT JOIN test_categories tc 
+                ON (t.category_id = tc.category_id OR mt.category_id = tc.category_id)
             WHERE
                 l.is_verified = TRUE
                 AND t.is_verified = TRUE
-                AND LOWER(t.test_name) = LOWER($3)
+                AND (
+                    LOWER(t.test_name) ILIKE LOWER($3)
+                    OR LOWER(mt.test_name) ILIKE LOWER($3)
+                    OR LOWER(tc.name) ILIKE LOWER($3)
+                    OR EXISTS (
+                        SELECT 1 FROM unnest(mt.aliases) alias 
+                        WHERE LOWER(alias) ILIKE LOWER($3)
+                    )
+                    OR LOWER(t.test_name) ILIKE LOWER('%' || $3 || '%')
+                )
                 AND ST_DWithin(
                     l.location_coordinates,
                     ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
@@ -73,10 +91,23 @@ exports.searchLabs = async (req, res) => {
             FROM labs l
             INNER JOIN tests t
                 ON l.lab_id = t.lab_id
+            LEFT JOIN master_tests mt 
+                ON t.master_test_id = mt.master_test_id
+            LEFT JOIN test_categories tc 
+                ON (t.category_id = tc.category_id OR mt.category_id = tc.category_id)
             WHERE
                 l.is_verified = TRUE
                 AND t.is_verified = TRUE
-                AND LOWER(t.test_name) = LOWER($1)
+                AND (
+                    LOWER(t.test_name) ILIKE LOWER($1)
+                    OR LOWER(mt.test_name) ILIKE LOWER($1)
+                    OR LOWER(tc.name) ILIKE LOWER($1)
+                    OR EXISTS (
+                        SELECT 1 FROM unnest(mt.aliases) alias 
+                        WHERE LOWER(alias) ILIKE LOWER($1)
+                    )
+                    OR LOWER(t.test_name) ILIKE LOWER('%' || $1 || '%')
+                )
                 AND ST_DWithin(
                     l.location_coordinates,
                     ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
@@ -380,5 +411,110 @@ exports.getSingleLabDetails = async (req, res) => {
     } catch (error) {
         console.error("Get Single Lab Error:", error);
         return res.status(500).json({ success: false, error: "Server error while fetching lab details." });
+    }
+};
+
+// --- GET ALL TEST CATEGORIES ---
+exports.getCategories = async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                tc.category_id,
+                tc.name,
+                tc.icon,
+                tc.description,
+                COUNT(DISTINCT t.test_id) AS available_tests_count
+            FROM test_categories tc
+            LEFT JOIN master_tests mt ON tc.category_id = mt.category_id
+            LEFT JOIN tests t ON (t.category_id = tc.category_id OR t.master_test_id = mt.master_test_id) AND t.is_verified = TRUE
+            GROUP BY tc.category_id, tc.name, tc.icon, tc.description
+            ORDER BY tc.category_id ASC;
+        `;
+        const result = await db.query(query);
+        return res.status(200).json({ success: true, categories: result.rows });
+    } catch (error) {
+        console.error("Get Categories Error:", error);
+        return res.status(500).json({ success: false, error: "Failed to fetch test categories." });
+    }
+};
+
+// --- GET MASTER TESTS DICTIONARY FOR LAB AUTOCOMPLETE ---
+exports.getMasterTests = async (req, res) => {
+    try {
+        const { category_id, q } = req.query;
+        let filter = "";
+        const params = [];
+
+        if (category_id) {
+            params.push(parseInt(category_id, 10));
+            filter += ` AND mt.category_id = $${params.length}`;
+        }
+
+        if (q && q.trim()) {
+            params.push(`%${q.trim()}%`);
+            filter += ` AND (mt.test_name ILIKE $${params.length} OR EXISTS (SELECT 1 FROM unnest(mt.aliases) alias WHERE alias ILIKE $${params.length}))`;
+        }
+
+        const query = `
+            SELECT 
+                mt.master_test_id,
+                mt.category_id,
+                mt.test_name,
+                mt.description,
+                mt.sample_type,
+                mt.fasting_required,
+                mt.turnaround_hours,
+                mt.aliases,
+                tc.name AS category_name,
+                tc.icon AS category_icon
+            FROM master_tests mt
+            LEFT JOIN test_categories tc ON mt.category_id = tc.category_id
+            WHERE 1=1 ${filter}
+            ORDER BY mt.test_name ASC;
+        `;
+        const result = await db.query(query, params);
+        return res.status(200).json({ success: true, master_tests: result.rows });
+    } catch (error) {
+        console.error("Get Master Tests Error:", error);
+        return res.status(500).json({ success: false, error: "Failed to fetch master test catalog." });
+    }
+};
+
+// --- REAL-TIME SEARCH AUTO-SUGGESTIONS FOR PATIENT SEARCH BAR ---
+exports.getSearchSuggestions = async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q || !q.trim()) {
+            return res.status(200).json({ success: true, suggestions: [] });
+        }
+        const term = `%${q.trim()}%`;
+        const query = `
+            SELECT DISTINCT 
+                mt.test_name AS label, 
+                'test' AS type,
+                tc.name AS category_name,
+                tc.icon AS category_icon
+            FROM master_tests mt
+            LEFT JOIN test_categories tc ON mt.category_id = tc.category_id
+            WHERE mt.test_name ILIKE $1 
+               OR EXISTS (SELECT 1 FROM unnest(mt.aliases) a WHERE a ILIKE $1)
+            
+            UNION
+            
+            SELECT DISTINCT 
+                name AS label, 
+                'category' AS type,
+                name AS category_name,
+                icon AS category_icon
+            FROM test_categories
+            WHERE name ILIKE $1
+            
+            LIMIT 8;
+        `;
+        const result = await db.query(query, [term]);
+        return res.status(200).json({ success: true, suggestions: result.rows });
+    } catch (error) {
+        console.error("Get Suggestions Error:", error);
+        return res.status(500).json({ success: false, error: "Failed to fetch search suggestions." });
     }
 };

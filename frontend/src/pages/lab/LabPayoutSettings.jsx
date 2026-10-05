@@ -15,6 +15,9 @@ export default function LabPayoutSettings() {
     confirm_account_number: "",
     bank_ifsc: "",
     business_entity_type: "individual",
+    city: "",
+    state: "",
+    pincode: "",
   });
 
   const fetchPayoutDetails = async () => {
@@ -29,6 +32,9 @@ export default function LabPayoutSettings() {
             bank_account_holder_name: res.payout_info.bank_account_holder_name || "",
             bank_ifsc: res.payout_info.bank_ifsc || "",
             business_entity_type: res.payout_info.business_entity_type || "individual",
+            city: res.payout_info.city || "",
+            state: res.payout_info.state || "",
+            pincode: res.payout_info.pincode || "",
           }));
         }
       }
@@ -73,6 +79,9 @@ export default function LabPayoutSettings() {
           bank_ifsc: formData.bank_ifsc.trim().toUpperCase(),
           bank_account_holder_name: formData.bank_account_holder_name.trim(),
           business_entity_type: formData.business_entity_type,
+          city: formData.city.trim(),
+          state: formData.state.trim(),
+          pincode: formData.pincode.trim(),
         }),
       });
 
@@ -390,6 +399,52 @@ export default function LabPayoutSettings() {
                     <option value="private_limited">Private Limited (Pvt Ltd)</option>
                     <option value="llp">Limited Liability Partnership (LLP)</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Registered Business Location for Razorpay Onboarding */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    placeholder="e.g. Mumbai"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    name="state"
+                    value={formData.state}
+                    onChange={handleChange}
+                    placeholder="e.g. Maharashtra"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                    Pincode / ZIP
+                  </label>
+                  <input
+                    type="text"
+                    name="pincode"
+                    value={formData.pincode}
+                    onChange={handleChange}
+                    placeholder="e.g. 400001"
+                    maxLength={6}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm font-mono"
+                  />
                 </div>
               </div>
 

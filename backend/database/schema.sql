@@ -9,6 +9,8 @@ DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS appointments CASCADE;
 DROP TABLE IF EXISTS time_slots CASCADE;
 DROP TABLE IF EXISTS tests CASCADE;
+DROP TABLE IF EXISTS master_tests CASCADE;
+DROP TABLE IF EXISTS test_categories CASCADE;
 DROP TABLE IF EXISTS labs CASCADE;
 DROP TABLE IF EXISTS patients CASCADE;
 
@@ -39,7 +41,30 @@ CREATE TABLE labs (
     bank_ifsc VARCHAR(20),
     bank_account_holder_name VARCHAR(255),
     business_entity_type VARCHAR(50) DEFAULT 'individual',
+    city VARCHAR(100),
+    state VARCHAR(100),
+    pincode VARCHAR(10),
     platform_commission_percentage DECIMAL(5, 2) DEFAULT 10.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE test_categories (
+    category_id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    icon VARCHAR(10) DEFAULT '🧪',
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE master_tests (
+    master_test_id SERIAL PRIMARY KEY,
+    category_id INT REFERENCES test_categories(category_id) ON DELETE CASCADE,
+    test_name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    sample_type VARCHAR(50) DEFAULT 'Blood',
+    fasting_required BOOLEAN DEFAULT FALSE,
+    turnaround_hours INT DEFAULT 24,
+    aliases TEXT[] DEFAULT '{}',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -49,6 +74,11 @@ CREATE TABLE tests (
     test_name VARCHAR(255) NOT NULL,
     description TEXT,
     price DECIMAL(10, 2) NOT NULL,
+    category_id INT REFERENCES test_categories(category_id) ON DELETE SET NULL,
+    master_test_id INT REFERENCES master_tests(master_test_id) ON DELETE SET NULL,
+    sample_type VARCHAR(50) DEFAULT 'Blood',
+    fasting_required BOOLEAN DEFAULT FALSE,
+    turnaround_hours INT DEFAULT 24,
     is_verified BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
