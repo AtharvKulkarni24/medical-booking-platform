@@ -99,7 +99,7 @@ export default function Home() {
         setIsLocating(false)
         navigate(`/search?test=${encodeURIComponent(testName)}`)
       },
-      { timeout: 4000 }
+      { timeout: 15000 }
     )
   }
 
@@ -140,7 +140,7 @@ export default function Home() {
           navigate('/search/labs')
         }
       },
-      { timeout: 4000 }
+      { timeout: 15000 }
     )
   }
 
