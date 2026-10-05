@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { apiUrl } from "../api/client";
 
 export default function Reviews() {
   const navigate = useNavigate();
@@ -29,8 +30,8 @@ export default function Reviews() {
       };
 
       const [appointmentsRes, reviewsRes] = await Promise.all([
-        fetch('http://localhost:5000/api/patients/appointments/completed', { headers }),
-        fetch('http://localhost:5000/api/patients/reviews/past', { headers })
+        fetch(apiUrl('patients/appointments/completed'), { headers }),
+        fetch(apiUrl('patients/reviews/past'), { headers })
       ]);
       
       if (!appointmentsRes.ok || !reviewsRes.ok) {
@@ -70,7 +71,7 @@ export default function Reviews() {
     setIsSubmitting(true);
     
     try {
-      const response = await fetch(`http://localhost:5000/api/reviews/appointment/${selectedAppointmentId}`, {
+      const response = await fetch(apiUrl(`reviews/appointment/${selectedAppointmentId}`), {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

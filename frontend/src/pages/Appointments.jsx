@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { apiUrl } from "../api/client";
 
 export default function Appointments() {
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ export default function Appointments() {
 
       try {
         const response = await fetch(
-          "http://localhost:5000/api/appointments/my-appointments",
+          apiUrl("appointments/my-appointments"),
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -73,7 +74,7 @@ export default function Appointments() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/appointments/${appointmentId}/cancel`,
+        apiUrl(`appointments/${appointmentId}/cancel`),
         {
           method: "PATCH",
           headers: {

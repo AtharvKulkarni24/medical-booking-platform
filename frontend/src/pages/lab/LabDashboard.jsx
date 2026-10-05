@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { apiUrl } from '../../api/client'
 
 export default function LabDashboard() {
   const navigate = useNavigate()
@@ -25,7 +26,7 @@ export default function LabDashboard() {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/api/labs/dashboard-stats', {
+        const response = await fetch(apiUrl('labs/dashboard-stats'), {
           headers: {
             'Authorization': `Bearer ${token}`
           }

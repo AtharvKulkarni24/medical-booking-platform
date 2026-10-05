@@ -1,9 +1,13 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+).replace(/\/+$/, "");
+
+export const apiUrl = (path) =>
+  `${API_BASE_URL}/${path.replace(/^\/+/, "")}`;
 
 export const apiClient = {
   async request(endpoint, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = apiUrl(endpoint);
     const headers = new Headers(options.headers);
 
     if (!headers.has("Content-Type")) {

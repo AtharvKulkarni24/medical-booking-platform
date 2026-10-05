@@ -5,7 +5,6 @@ require("dotenv").config();
 // Create a new pool using the connection string
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: false,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
 });

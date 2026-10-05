@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { apiUrl } from '../../api/client'
 
 export default function LabReviews() {
   const navigate = useNavigate()
@@ -22,7 +23,7 @@ export default function LabReviews() {
       }
 
       try {
-        const response = await fetch(`http://localhost:5000/api/reviews/lab/${user.id}`, {
+        const response = await fetch(apiUrl(`reviews/lab/${user.id}`), {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         const result = await response.json()

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
+import { apiUrl } from '../api/client'
 
 export default function Search() {
   const [searchParams] = useSearchParams()
@@ -24,7 +25,7 @@ export default function Search() {
 
       try {
         const params = new URLSearchParams({ test, lat: lat.toString(), lng: lng.toString() });
-        const response = await fetch(`http://localhost:5000/api/search/labs?${params.toString()}`);
+        const response = await fetch(apiUrl(`search/labs?${params.toString()}`));
         const result = await response.json();
 
         if (!response.ok) {

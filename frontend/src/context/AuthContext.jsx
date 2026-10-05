@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { apiUrl } from '../api/client';
 
 const AuthContext = createContext();
 
@@ -21,8 +22,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials, role) => {
     const endpoint = role === 'patient'
-      ? 'http://localhost:5000/api/patients/login'
-      : 'http://localhost:5000/api/labs/login';
+      ? apiUrl('patients/login')
+      : apiUrl('labs/login');
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -55,7 +56,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       // Tell backend to clear cookie and blacklist token
-      await fetch('http://localhost:5000/api/logout', {
+      await fetch(apiUrl('logout'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'

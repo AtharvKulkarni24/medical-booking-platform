@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { apiUrl } from '../../api/client'
 
 export default function LabTests() {
   const navigate = useNavigate()
@@ -43,9 +44,9 @@ export default function LabTests() {
 
       try {
         const [testsRes, catRes, masterRes] = await Promise.all([
-          fetch('http://localhost:5000/api/labs/tests', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:5000/api/search/categories'),
-          fetch('http://localhost:5000/api/search/master-tests')
+          fetch(apiUrl('labs/tests'), { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(apiUrl('search/categories')),
+          fetch(apiUrl('search/master-tests'))
         ])
 
         const testsData = await testsRes.json()
@@ -104,7 +105,7 @@ export default function LabTests() {
     const token = localStorage.getItem('accessToken')
     
     try {
-      const response = await fetch(`http://localhost:5000/api/labs/tests/${deleteConfirmData.id}`, {
+      const response = await fetch(apiUrl(`labs/tests/${deleteConfirmData.id}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -138,7 +139,7 @@ export default function LabTests() {
     const token = localStorage.getItem('accessToken')
 
     try {
-      const response = await fetch(`http://localhost:5000/api/labs/tests/${editModalData.test_id}`, {
+      const response = await fetch(apiUrl(`labs/tests/${editModalData.test_id}`), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -174,7 +175,7 @@ export default function LabTests() {
     const token = localStorage.getItem('accessToken')
 
     try {
-      const response = await fetch(`http://localhost:5000/api/labs/tests`, {
+      const response = await fetch(apiUrl('labs/tests'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

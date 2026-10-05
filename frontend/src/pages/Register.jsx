@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { apiUrl } from "../api/client";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -83,8 +84,8 @@ export default function Register() {
     try {
       const endpoint =
         role === "patient"
-          ? "http://localhost:5000/api/patients/register"
-          : "http://localhost:5000/api/labs/register";
+          ? apiUrl("patients/register")
+          : apiUrl("labs/register");
 
       const { address, ...restData } = formData;
       delete restData.confirm_password;

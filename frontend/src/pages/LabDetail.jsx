@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { apiUrl } from '../api/client'
 
 export default function LabDetail() {
   const { labId } = useParams()
@@ -15,7 +16,7 @@ export default function LabDetail() {
     const fetchLabDetails = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch(`http://localhost:5000/api/search/labs/${labId}`)
+        const response = await fetch(apiUrl(`search/labs/${labId}`))
         const data = await response.json()
 
         if (!response.ok) throw new Error(data.error || 'Failed to load diagnostic center details.')
@@ -25,7 +26,7 @@ export default function LabDetail() {
 
         // Fetch lab reviews
         try {
-          const revRes = await fetch(`http://localhost:5000/api/reviews/lab/${labId}`)
+          const revRes = await fetch(apiUrl(`reviews/lab/${labId}`))
           const revData = await revRes.json()
           if (revRes.ok) {
             setReviews(revData.reviews || [])

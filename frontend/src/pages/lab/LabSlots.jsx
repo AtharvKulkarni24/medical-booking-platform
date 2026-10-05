@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { apiUrl } from '../../api/client'
 
 const DAYS_OF_WEEK = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
@@ -34,7 +35,7 @@ export default function LabSlots() {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/api/labs/slots', {
+        const response = await fetch(apiUrl('labs/slots'), {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         const result = await response.json()
@@ -74,7 +75,7 @@ export default function LabSlots() {
     const token = localStorage.getItem('accessToken')
     
     try {
-      const response = await fetch(`http://localhost:5000/api/labs/slots/${deleteConfirmData.id}`, {
+      const response = await fetch(apiUrl(`labs/slots/${deleteConfirmData.id}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -101,8 +102,8 @@ export default function LabSlots() {
 
     const isEdit = !!editModalData
     const endpoint = isEdit 
-      ? `http://localhost:5000/api/labs/slots/${editModalData.slot_id}` 
-      : `http://localhost:5000/api/labs/slots`
+      ? apiUrl(`labs/slots/${editModalData.slot_id}`)
+      : apiUrl('labs/slots')
     
     try {
       const response = await fetch(endpoint, {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { apiUrl } from '../../api/client'
 
 export default function LabAppointments() {
   const navigate = useNavigate()
@@ -34,7 +35,7 @@ export default function LabAppointments() {
   const fetchLabAppointments = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`http://localhost:5000/api/labs/${labId}/appointments`, {
+      const response = await fetch(apiUrl(`labs/${labId}/appointments`), {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const result = await response.json()
@@ -66,7 +67,7 @@ export default function LabAppointments() {
     
     setIsSubmitting(true)
     try {
-      const response = await fetch(`http://localhost:5000/api/labs/appointments/${completeModalData.id}/complete`, {
+      const response = await fetch(apiUrl(`labs/appointments/${completeModalData.id}/complete`), {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

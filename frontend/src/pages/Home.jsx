@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { apiUrl } from '../api/client'
 
 const popularTests = [
   { id: 1, name: 'Blood Test', description: 'Evaluates overall health and detects a wide range of blood disorders.', icon: '🩸', badge: 'Most Popular' },
@@ -39,7 +40,7 @@ export default function Home() {
   }, [user, authLoading, navigate])
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/search/categories')
+    fetch(apiUrl('search/categories'))
       .then(res => res.json())
       .then(data => {
         if (data.success) setCategories(data.categories || [])
@@ -60,7 +61,7 @@ export default function Home() {
   const handleQueryChange = (val) => {
     setSearchQuery(val)
     if (val.trim().length >= 1) {
-      fetch(`http://localhost:5000/api/search/suggestions?q=${encodeURIComponent(val.trim())}`)
+      fetch(apiUrl(`search/suggestions?q=${encodeURIComponent(val.trim())}`))
         .then(res => res.json())
         .then(data => {
           if (data.success) {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
+import { apiUrl } from '../api/client'
 
 export default function SearchLabs() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -46,7 +47,7 @@ export default function SearchLabs() {
       const params = new URLSearchParams({ lat: lat.toString(), lng: lng.toString() })
       if (lab_name) params.append('lab_name', lab_name)
 
-      const response = await fetch(`http://localhost:5000/api/search/labs/directory?${params.toString()}`)
+      const response = await fetch(apiUrl(`search/labs/directory?${params.toString()}`))
       const data = await response.json()
 
       if (!response.ok) throw new Error(data.error || 'Failed to fetch diagnostic centers.')

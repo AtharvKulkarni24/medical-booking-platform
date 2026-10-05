@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { apiUrl } from '../api/client'
 
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -43,7 +44,7 @@ export default function TestDetail() {
     const fetchAvailability = async () => {
       setIsLoading(true)
       try {
-        const response = await fetch(`http://localhost:5000/api/search/labs/${labId}/tests/${testId}?date=${selectedDate}`)
+        const response = await fetch(apiUrl(`search/labs/${labId}/tests/${testId}?date=${selectedDate}`))
         const result = await response.json()
 
         if (!response.ok) throw new Error(result.error || 'Failed to load test details.')
@@ -115,7 +116,7 @@ export default function TestDetail() {
       const isScriptLoaded = await loadRazorpayScript()
       if (!isScriptLoaded) throw new Error("Failed to load Razorpay SDK.")
 
-      const orderResponse = await fetch('http://localhost:5000/api/appointments/create-order', {
+      const orderResponse = await fetch(apiUrl('appointments/create-order'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -134,7 +135,7 @@ export default function TestDetail() {
 
       // Direct fallback if testing environment simulated order
       if (orderData.order.id.startsWith("order_simulated_")) {
-        const verifyRes = await fetch('http://localhost:5000/api/appointments/verify-and-book', {
+        const verifyRes = await fetch(apiUrl('appointments/verify-and-book'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -175,7 +176,7 @@ export default function TestDetail() {
         order_id: orderData.order.id,
         handler: async function (response) {
           try {
-            const verifyRes = await fetch('http://localhost:5000/api/appointments/verify-and-book', {
+            const verifyRes = await fetch(apiUrl('appointments/verify-and-book'), {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

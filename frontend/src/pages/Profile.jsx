@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { apiUrl } from '../api/client'
 
 export default function Profile() {
   const { user, token, loading: authLoading, logout } = useAuth()
@@ -37,8 +38,8 @@ export default function Profile() {
     const fetchProfile = async () => {
       try {
         const endpoint = user.role === 'patient' 
-          ? 'http://localhost:5000/api/patients/profile' 
-          : 'http://localhost:5000/api/labs/profile';
+          ? apiUrl('patients/profile')
+          : apiUrl('labs/profile');
 
         const response = await fetch(endpoint, {
           method: 'GET',
@@ -122,8 +123,8 @@ export default function Profile() {
     try {
       const isLab = user.role === 'lab'
       const endpoint = isLab
-        ? 'http://localhost:5000/api/labs/profile'
-        : 'http://localhost:5000/api/patients/profile'
+        ? apiUrl('labs/profile')
+        : apiUrl('patients/profile')
 
       const method = isLab ? 'PUT' : 'PATCH'
 
@@ -169,8 +170,8 @@ export default function Profile() {
     try {
       const isLab = user.role === 'lab'
       const endpoint = isLab
-        ? 'http://localhost:5000/api/labs/profile/password'
-        : 'http://localhost:5000/api/patients/profile/password'
+        ? apiUrl('labs/profile/password')
+        : apiUrl('patients/profile/password')
 
       const response = await fetch(endpoint, {
         method: 'PATCH',

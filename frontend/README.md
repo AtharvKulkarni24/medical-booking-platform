@@ -50,6 +50,11 @@ Create a .env file in the frontend folder if you need custom configuration:
 VITE_API_URL=http://localhost:5000/api
 ```
 
+For deployment, set `VITE_API_URL` in the frontend hosting provider to the
+deployed backend's API root (for example, `https://api.example.com/api`) and
+rebuild the frontend. Vite embeds this value at build time; changing the hosting
+environment without rebuilding will not update the deployed bundle.
+
 ## Main Features
 
 - User registration and login
