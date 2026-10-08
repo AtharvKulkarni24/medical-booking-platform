@@ -32,3 +32,23 @@ required environment values in a protected local shell and run
 The contract stage is intentionally a separate operation: do not run it until
 the new backend has been verified in production and the compatibility period
 has ended.
+
+## Payment-order safeguards
+
+The appointment payment-order migration adds a durable order-to-patient and
+order-to-booking association used by server-side payment verification,
+idempotent finalization, serialized slot-capacity checks, and refund tracking.
+Deploy the compatible backend only after applying this additive migration.
+
+For a local or staging database, set `PAYMENT_ORDER_ENV_FILE` to the protected
+environment file, `ALLOW_PAYMENT_ORDER_MIGRATION=true`,
+`PAYMENT_ORDER_BACKUP_CONFIRMED=true`, and
+`PAYMENT_ORDER_TARGET_DATABASE` to the exact database name, then run
+`npm run db:migrate:payment-orders`. Production additionally requires
+`ALLOW_PRODUCTION_PAYMENT_ORDER_MIGRATION=true`; take and verify a restorable
+backup and coordinate the migration with the backend deployment first.
+
+The migration is additive and does not alter existing appointments or payments.
+If a capacity conflict occurs after a captured payment, the order is marked
+for refund, and its refund ID/status/error are recorded. A failed refund is
+reported explicitly and remains visible for support follow-up.

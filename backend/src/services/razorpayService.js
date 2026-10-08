@@ -1,4 +1,5 @@
 const Razorpay = require("razorpay");
+const crypto = require("crypto");
 
 const getRazorpayInstance = () => {
   const keyId = (process.env.RAZORPAY_KEY_ID || "").trim();
@@ -80,12 +81,10 @@ exports.createLinkedAccount = async (labData) => {
 };
 
 /**
-/**
  * Create a standard Razorpay Order for patient checkout (100% held in Platform Account)
  * Midnight batch job will handle payout transfers to labs after appointment completion.
  */
 exports.createStandardOrder = async ({ amount, commissionPercentage = 10 }) => {
-  const instance = getRazorpayInstance();
   const totalAmountPaise = Math.round(amount * 100);
   const platformFeePaise = Math.round(totalAmountPaise * (commissionPercentage / 100));
   const labPayoutPaise = totalAmountPaise - platformFeePaise;
@@ -93,6 +92,7 @@ exports.createStandardOrder = async ({ amount, commissionPercentage = 10 }) => {
   const shortReceipt = `rcpt_ord_${Date.now()}`;
 
   try {
+    const instance = getRazorpayInstance();
     const order = await instance.orders.create({
       amount: totalAmountPaise,
       currency: "INR",
@@ -108,16 +108,11 @@ exports.createStandardOrder = async ({ amount, commissionPercentage = 10 }) => {
   } catch (err) {
     console.warn("⚠️ Standard Order Creation Failed:", err?.error || err?.message);
 
-    if (
-      process.env.NODE_ENV !== "production" ||
-      err?.statusCode === 401 ||
-      err?.error?.code === "BAD_REQUEST_ERROR" ||
-      !process.env.RAZORPAY_KEY_ID
-    ) {
+    if (process.env.NODE_ENV !== "production") {
       console.log("ℹ️ Dev Fallback: Created mock order for checkout.");
       return {
         order: {
-          id: `order_mock_${Date.now()}`,
+          id: `order_mock_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`,
           amount: totalAmountPaise,
           currency: "INR",
         },
@@ -133,6 +128,15 @@ exports.createStandardOrder = async ({ amount, commissionPercentage = 10 }) => {
 
 // Backward-compatible alias
 exports.createSplitOrder = exports.createStandardOrder;
+
+exports.fetchCheckoutPayment = async ({ orderId, paymentId }) => {
+  const instance = getRazorpayInstance();
+  const [order, payment] = await Promise.all([
+    instance.orders.fetch(orderId),
+    instance.payments.fetch(paymentId),
+  ]);
+  return { order, payment };
+};
 
 /**
  * Execute Post-Appointment Payout Transfer to Lab Linked Account (Triggered by Midnight Cron or Admin)
@@ -195,8 +199,7 @@ exports.executePostPaymentTransfer = exports.executeLabTransfer;
  * Refund a Payment directly from Platform Account back to patient
  * (No transfer reversal needed since funds were held in Platform Account)
  */
-exports.processRefund = async ({ paymentId, amount }) => {
-  const instance = getRazorpayInstance();
+exports.processRefund = async ({ paymentId, amount, idempotencyKey }) => {
   const amountPaise = Math.round(amount * 100);
 
   const isMock = String(paymentId).startsWith("pay_mock_") || String(paymentId).startsWith("pay_sim_") || String(paymentId).startsWith("order_mock_");
@@ -213,9 +216,27 @@ exports.processRefund = async ({ paymentId, amount }) => {
   }
 
   try {
+    const instance = getRazorpayInstance();
+    if (idempotencyKey) {
+      const existingRefunds = await instance.payments.fetchMultipleRefund(paymentId, { count: 100 });
+      const matchingRefund = (existingRefunds.items || []).find(
+        (refund) => refund.notes?.appointment_order_id === idempotencyKey
+      );
+
+      if (matchingRefund && matchingRefund.status !== "failed") {
+        return {
+          success: true,
+          refund_id: matchingRefund.id,
+          amount: matchingRefund.amount / 100,
+          status: matchingRefund.status || "pending",
+        };
+      }
+    }
+
     const refund = await instance.payments.refund(paymentId, {
       amount: amountPaise,
       speed: "normal",
+      ...(idempotencyKey ? { notes: { appointment_order_id: idempotencyKey } } : {}),
     });
 
     return {

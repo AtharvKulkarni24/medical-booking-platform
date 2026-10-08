@@ -1,13 +1,25 @@
 const db = require("../config/db");
-const Razorpay = require("razorpay");
 const crypto = require("crypto");
-const { createSplitOrder, executePostPaymentTransfer, processRefund } = require("../services/razorpayService");
+const {
+  createSplitOrder,
+  executePostPaymentTransfer,
+  fetchCheckoutPayment,
+  processRefund,
+} = require("../services/razorpayService");
 
-// Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || "YOUR_TEST_KEY_ID",
-  key_secret: process.env.RAZORPAY_KEY_SECRET || "YOUR_TEST_SECRET",
-});
+const isValidRazorpaySignature = (orderId, paymentId, signature) => {
+  const secret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+  if (!secret || typeof signature !== "string" || !/^[a-f\d]{64}$/i.test(signature)) {
+    return false;
+  }
+
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(`${orderId}|${paymentId}`)
+    .digest();
+  const received = Buffer.from(signature, "hex");
+  return received.length === expected.length && crypto.timingSafeEqual(received, expected);
+};
 
 // ==========================================
 // STEP 1: CREATE PAYMENT ORDER
@@ -127,6 +139,31 @@ exports.createAppointmentOrder = async (req, res) => {
       commissionPercentage: commissionPercent,
     });
 
+    const savedOrder = await db.query(
+      `INSERT INTO appointment_payment_orders
+        (razorpay_order_id, patient_id, lab_test_slot_id, appointment_date, amount,
+         currency, platform_fee, lab_payout_amount, is_mock)
+       SELECT $1, $2, lts.lab_test_slot_id, $3, $4, $5, $6, $7, $8
+       FROM lab_test_slots lts
+       WHERE lts.lab_id = $9 AND lts.test_id = $10 AND lts.slot_id = $11`,
+      [
+        splitResult.order.id,
+        req.user.id,
+        appointment_date,
+        testPrice,
+        splitResult.order.currency || "INR",
+        splitResult.platformFee,
+        splitResult.labPayout,
+        splitResult.is_mock === true,
+        lab_id,
+        test_id,
+        slot_id,
+      ],
+    );
+    if (savedOrder.rowCount !== 1) {
+      throw new Error("The booking order could not be associated with the selected slot.");
+    }
+
     const keyId = (process.env.RAZORPAY_KEY_ID || "").trim();
 
     res.status(200).json({
@@ -138,6 +175,7 @@ exports.createAppointmentOrder = async (req, res) => {
         key_id: keyId,
         platform_fee: splitResult.platformFee,
         lab_payout: splitResult.labPayout,
+        is_mock: splitResult.is_mock === true,
       },
     });
   } catch (error) {
@@ -152,115 +190,300 @@ exports.createAppointmentOrder = async (req, res) => {
 // ==========================================
 // STEP 2: VERIFY PAYMENT & SAVE APPOINTMENT
 // ==========================================
-exports.verifyAndBookAppointment = async (req, res) => {
-  const client = await db.connect(); 
+const attemptCapacityRefund = async ({ orderId, paymentId, amount }) => {
+  try {
+    const refund = await processRefund({
+      paymentId,
+      amount,
+      idempotencyKey: orderId,
+    });
+    const refundStatus = refund.status === "processed" ? "PROCESSED" : "PENDING";
+    await db.query(
+      `UPDATE appointment_payment_orders
+       SET refund_id = $2, refund_status = $3, refund_error = NULL,
+           updated_at = NOW()
+       WHERE razorpay_order_id = $1`,
+      [orderId, refund.refund_id, refundStatus],
+    );
+    return { status: refundStatus, refund_id: refund.refund_id };
+  } catch (error) {
+    console.error("Capacity-conflict refund failed:", error);
+    await db.query(
+      `UPDATE appointment_payment_orders
+       SET refund_status = 'FAILED', refund_error = $2, updated_at = NOW()
+       WHERE razorpay_order_id = $1`,
+      [orderId, error.message || "Refund request failed"],
+    );
+    return { status: "FAILED" };
+  }
+};
 
+exports.verifyAndBookAppointment = async (req, res) => {
+  let client;
+  let transactionStarted = false;
   try {
     const patientId = req.user.id;
-    const { 
-      razorpay_order_id, 
-      razorpay_payment_id, 
-      razorpay_signature,
-      lab_id,
-      test_id,
-      slot_id,
-      appointment_date
-    } = req.body;
+    const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body;
 
-    if (!appointment_date) {
-        return res.status(400).json({ success: false, error: "Appointment date is required." });
+    if (!orderId || !paymentId || !signature) {
+      return res.status(400).json({ success: false, error: "Payment verification details are required." });
     }
 
-    // 1. Verify the Payment Signature (bypassed if mock order in dev)
-    const isMockOrder = String(razorpay_order_id).startsWith("order_mock_");
-    if (!isMockOrder) {
-      const body = razorpay_order_id + "|" + razorpay_payment_id;
-      const expectedSignature = crypto
-        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "HCM49MMt2paNN5zTe5mxAgcN")
-        .update(body.toString())
-        .digest("hex");
+    const orderResult = await db.query(
+      `SELECT razorpay_order_id, patient_id, lab_test_slot_id,
+              appointment_date::text AS appointment_date, amount, currency,
+              platform_fee, lab_payout_amount, is_mock, status,
+              razorpay_payment_id, appointment_id, refund_id, refund_status,
+              refund_error, created_at, updated_at
+       FROM appointment_payment_orders
+       WHERE razorpay_order_id = $1 AND patient_id = $2`,
+      [orderId, patientId],
+    );
+    if (orderResult.rowCount === 0) {
+      return res.status(404).json({ success: false, error: "Booking order not found." });
+    }
 
-      if (expectedSignature !== razorpay_signature) {
-        return res.status(400).json({ success: false, error: "Invalid payment signature. Booking failed." });
+    const order = orderResult.rows[0];
+    if (order.status === "BOOKED") {
+      if (order.razorpay_payment_id !== paymentId) {
+        return res.status(409).json({ success: false, error: "This order was finalized with a different payment." });
       }
-    }
-
-    await client.query("BEGIN");
-
-    // 2. Fetch the test price so we can log the exact amount paid in the payments table
-    const testQuery = await client.query(
-      `SELECT t.price
-       FROM lab_test_slots lts
-       JOIN tests t ON t.test_id = lts.test_id AND t.lab_id = lts.lab_id
-       WHERE lts.lab_id = $1 AND lts.test_id = $2 AND lts.slot_id = $3`,
-      [lab_id, test_id, slot_id]
-    );
-    if (testQuery.rowCount === 0) throw new Error("Test not found");
-    const amountPaid = testQuery.rows[0].price;
-
-    // 3. Save the Appointment (No payment_id here anymore!)
-    const appointmentResult = await client.query(
-      `INSERT INTO appointments (patient_id, lab_test_slot_id, appointment_date, status)
-       SELECT $1, selected.lab_test_slot_id, $5, 'CONFIRMED'
-       FROM lab_test_slots selected
-       WHERE (
-          SELECT COUNT(*) 
-          FROM appointments a
-          JOIN lab_test_slots booked ON booked.lab_test_slot_id = a.lab_test_slot_id
-          WHERE booked.slot_id = selected.slot_id
-            AND a.appointment_date = $5 AND a.status = 'CONFIRMED'
-       ) < (
-          SELECT max_capacity 
-          FROM time_slots s
-          WHERE s.slot_id = selected.slot_id AND s.lab_id = selected.lab_id
-       )
-       AND selected.lab_id = $2 AND selected.test_id = $3 AND selected.slot_id = $4
-       RETURNING appointment_id, status, created_at;`,
-      [patientId, lab_id, test_id, slot_id, appointment_date]
-    );
-
-    if (appointmentResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      return res.status(409).json({ 
-          success: false, 
-          error: "Sorry, this slot just filled up. Payment will be refunded." 
+      return res.status(200).json({
+        success: true,
+        message: "Payment verified and appointment booked successfully!",
+        appointment: {
+          appointment_id: order.appointment_id,
+          status: "CONFIRMED",
+        },
       });
     }
 
-    const newAppointmentId = appointmentResult.rows[0].appointment_id;
+    const isMockOrder = order.is_mock === true;
+    if (isMockOrder) {
+      if (process.env.NODE_ENV === "production" || !/^(pay_mock_|pay_sim_)/.test(paymentId)) {
+        return res.status(400).json({ success: false, error: "Invalid mock payment." });
+      }
+    } else if (!isValidRazorpaySignature(orderId, paymentId, signature)) {
+      return res.status(400).json({ success: false, error: "Invalid payment signature." });
+    }
 
-    // 4. Log payment entry with PENDING payout status (for scheduled midnight batch transfer)
-    const labQuery = await client.query(
-      `SELECT platform_commission_percentage FROM labs WHERE lab_id = $1`,
-      [lab_id]
+    if (!isMockOrder) {
+      let paymentDetails;
+      try {
+        paymentDetails = await fetchCheckoutPayment({ orderId, paymentId });
+      } catch (error) {
+        console.error("Razorpay payment verification request failed:", error);
+        return res.status(502).json({ success: false, error: "Could not verify payment with Razorpay. Retry shortly." });
+      }
+
+      const expectedAmount = Math.round(Number(order.amount) * 100);
+      if (
+        paymentDetails.order.id !== orderId ||
+        paymentDetails.order.amount !== expectedAmount ||
+        paymentDetails.order.currency !== order.currency ||
+        paymentDetails.payment.order_id !== orderId ||
+        paymentDetails.payment.amount !== expectedAmount ||
+        paymentDetails.payment.currency !== order.currency
+      ) {
+        return res.status(400).json({ success: false, error: "Razorpay payment does not match this booking order." });
+      }
+      if (paymentDetails.order.status !== "paid" || paymentDetails.payment.status !== "captured") {
+        return res.status(409).json({ success: false, error: "Payment is not captured yet. Retry verification after capture." });
+      }
+    }
+
+    client = await db.connect();
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    const lockedOrderResult = await client.query(
+      `SELECT razorpay_order_id, patient_id, lab_test_slot_id,
+              appointment_date::text AS appointment_date, amount, currency,
+              platform_fee, lab_payout_amount, is_mock, status,
+              razorpay_payment_id, appointment_id, refund_id, refund_status,
+              refund_error, created_at, updated_at
+       FROM appointment_payment_orders
+       WHERE razorpay_order_id = $1 AND patient_id = $2
+       FOR UPDATE`,
+      [orderId, patientId],
     );
-    const labData = labQuery.rows[0] || {};
-    const commPercent = parseFloat(labData.platform_commission_percentage || 10.0);
-    const platformFee = Math.round(amountPaid * (commPercent / 100) * 100) / 100;
-    const labPayout = Math.round((amountPaid - platformFee) * 100) / 100;
+    if (lockedOrderResult.rowCount === 0) {
+      throw new Error("Booking order disappeared during finalization.");
+    }
+    const lockedOrder = lockedOrderResult.rows[0];
+
+    if (lockedOrder.status === "BOOKED") {
+      if (lockedOrder.razorpay_payment_id !== paymentId) {
+        await client.query("ROLLBACK");
+        transactionStarted = false;
+        return res.status(409).json({ success: false, error: "This order was finalized with a different payment." });
+      }
+      await client.query("COMMIT");
+      transactionStarted = false;
+      return res.status(200).json({
+        success: true,
+        message: "Payment verified and appointment booked successfully!",
+        appointment: { appointment_id: lockedOrder.appointment_id, status: "CONFIRMED" },
+      });
+    }
+
+    if (lockedOrder.razorpay_payment_id && lockedOrder.razorpay_payment_id !== paymentId) {
+      await client.query("ROLLBACK");
+      transactionStarted = false;
+      return res.status(409).json({ success: false, error: "This order is already associated with a different payment." });
+    }
+
+    if (lockedOrder.status === "REFUND_REQUIRED") {
+      if (lockedOrder.refund_status === "PROCESSED") {
+        await client.query("COMMIT");
+        transactionStarted = false;
+        return res.status(409).json({
+          success: false,
+          error: "The slot could not be booked and the payment has been refunded.",
+          refund: { status: "PROCESSED", refund_id: lockedOrder.refund_id },
+        });
+      }
+      if (
+        lockedOrder.refund_status === "PROCESSING" &&
+        new Date(lockedOrder.updated_at).getTime() > Date.now() - 2 * 60 * 1000
+      ) {
+        await client.query("COMMIT");
+        transactionStarted = false;
+        return res.status(202).json({
+          success: false,
+          error: "The booking could not be completed; refund processing is underway.",
+          refund: { status: "PROCESSING" },
+        });
+      }
+      await client.query(
+        `UPDATE appointment_payment_orders
+         SET refund_status = 'PROCESSING', updated_at = NOW()
+         WHERE razorpay_order_id = $1`,
+        [orderId],
+      );
+      await client.query("COMMIT");
+      transactionStarted = false;
+      const refund = await attemptCapacityRefund({
+        orderId,
+        paymentId,
+        amount: Number(lockedOrder.amount),
+      });
+      return res.status(refund.status === "FAILED" ? 502 : 409).json({
+        success: false,
+        error: refund.status === "FAILED"
+          ? "The slot could not be booked and the refund failed. Support must review this payment."
+          : refund.status === "PENDING"
+            ? "The slot could not be booked; the refund is pending with Razorpay."
+            : "The slot could not be booked and the payment has been refunded.",
+        refund,
+      });
+    }
+
+    const slotResult = await client.query(
+      `SELECT s.slot_id, s.day_of_week, s.start_time::text AS start_time, s.max_capacity,
+              lts.lab_test_slot_id, CURRENT_DATE::text AS today, LOCALTIME::text AS current_time
+       FROM lab_test_slots lts
+       JOIN time_slots s ON s.slot_id = lts.slot_id AND s.lab_id = lts.lab_id
+       WHERE lts.lab_test_slot_id = $1
+       FOR UPDATE OF s`,
+      [lockedOrder.lab_test_slot_id],
+    );
+    const slot = slotResult.rows[0];
+    const dayIsValid = slot &&
+      new Date(`${lockedOrder.appointment_date}T00:00:00Z`).getUTCDay() === slot.day_of_week;
+    const dateHasPassed = slot && lockedOrder.appointment_date < slot.today;
+    const timeHasPassed = slot &&
+      lockedOrder.appointment_date === slot.today &&
+      slot.current_time >= slot.start_time;
+    const bookedResult = slot
+      ? await client.query(
+          `SELECT COUNT(*)::int AS booked
+           FROM appointments a
+           JOIN lab_test_slots booked_slot ON booked_slot.lab_test_slot_id = a.lab_test_slot_id
+           WHERE booked_slot.slot_id = $1
+             AND a.appointment_date = $2
+             AND a.status = 'CONFIRMED'`,
+          [slot.slot_id, lockedOrder.appointment_date],
+        )
+      : { rows: [{ booked: 0 }] };
+    const slotFull = slot && bookedResult.rows[0].booked >= slot.max_capacity;
+
+    if (!slot || !dayIsValid || dateHasPassed || timeHasPassed || slotFull) {
+      await client.query(
+        `UPDATE appointment_payment_orders
+         SET status = 'REFUND_REQUIRED', razorpay_payment_id = $2,
+             refund_status = 'PROCESSING', refund_error = NULL, updated_at = NOW()
+         WHERE razorpay_order_id = $1`,
+        [orderId, paymentId],
+      );
+      await client.query("COMMIT");
+      transactionStarted = false;
+      const refund = await attemptCapacityRefund({
+        orderId,
+        paymentId,
+        amount: Number(lockedOrder.amount),
+      });
+      return res.status(refund.status === "FAILED" ? 502 : 409).json({
+        success: false,
+        error: refund.status === "FAILED"
+          ? "Payment succeeded but the booking could not be completed and the refund failed. Support must review this payment."
+          : refund.status === "PENDING"
+            ? "Payment succeeded but the booking could not be completed; the refund is pending with Razorpay."
+            : "Payment succeeded but the slot is no longer bookable. The payment has been refunded.",
+        refund,
+      });
+    }
+
+    const appointmentResult = await client.query(
+      `INSERT INTO appointments (patient_id, lab_test_slot_id, appointment_date, status)
+       VALUES ($1, $2, $3, 'CONFIRMED')
+       RETURNING appointment_id, status, created_at`,
+      [patientId, lockedOrder.lab_test_slot_id, lockedOrder.appointment_date],
+    );
+    const appointment = appointmentResult.rows[0];
 
     await client.query(
-      `INSERT INTO payments 
-        (appointment_id, amount, gateway_provider, gateway_order_id, gateway_payment_id, platform_fee, lab_payout_amount, status, payout_status, transaction_date)
-       VALUES 
-        ($1, $2, 'Razorpay', $3, $4, $5, $6, 'Success', 'PENDING', NOW())`,
-      [newAppointmentId, amountPaid, razorpay_order_id, razorpay_payment_id, platformFee, labPayout]
+      `INSERT INTO payments
+        (appointment_id, amount, gateway_provider, gateway_order_id, gateway_payment_id,
+         platform_fee, lab_payout_amount, status, payout_status, transaction_date)
+       VALUES ($1, $2, 'Razorpay', $3, $4, $5, $6, 'Success', 'PENDING', NOW())`,
+      [
+        appointment.appointment_id,
+        lockedOrder.amount,
+        orderId,
+        paymentId,
+        lockedOrder.platform_fee,
+        lockedOrder.lab_payout_amount,
+      ],
+    );
+    await client.query(
+      `UPDATE appointment_payment_orders
+       SET status = 'BOOKED', razorpay_payment_id = $2, appointment_id = $3,
+           updated_at = NOW()
+       WHERE razorpay_order_id = $1`,
+      [orderId, paymentId, appointment.appointment_id],
     );
 
     await client.query("COMMIT");
-
-    res.status(201).json({
+    transactionStarted = false;
+    return res.status(201).json({
       success: true,
       message: "Payment verified and appointment booked successfully!",
-      appointment: appointmentResult.rows[0]
+      appointment,
     });
-
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (transactionStarted && client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("Booking transaction rollback failed:", rollbackError);
+      }
+      transactionStarted = false;
+    }
     console.error("Verification/Booking Error:", error);
-    res.status(500).json({ success: false, error: "Server error during booking finalization." });
+    return res.status(500).json({ success: false, error: "Server error during booking finalization." });
   } finally {
-    client.release();
+    if (client) client.release();
   }
 };
 

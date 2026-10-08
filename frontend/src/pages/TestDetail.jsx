@@ -133,8 +133,8 @@ export default function TestDetail() {
       const orderData = await orderResponse.json()
       if (!orderResponse.ok) throw new Error(orderData.error || "Failed to initialize booking order.")
 
-      // Direct fallback if testing environment simulated order
-      if (orderData.order.id.startsWith("order_simulated_")) {
+      // Local mock orders never open Razorpay Checkout.
+      if (orderData.order.is_mock) {
         const verifyRes = await fetch(apiUrl('appointments/verify-and-book'), {
           method: 'POST',
           headers: {
@@ -144,11 +144,7 @@ export default function TestDetail() {
           body: JSON.stringify({
             razorpay_order_id: orderData.order.id,
             razorpay_payment_id: `pay_sim_${Date.now()}`,
-            razorpay_signature: "simulated_signature",
-            lab_id: labId,
-            test_id: testId,
-            slot_id: slot.slot_id,
-            appointment_date: selectedDate
+            razorpay_signature: "mock_signature"
           })
         })
 
@@ -167,8 +163,9 @@ export default function TestDetail() {
       }
 
       // Live Razorpay Checkout Window
+      if (!orderData.order.key_id) throw new Error("Payment checkout is not configured.")
       const options = {
-        key: orderData.order.key_id || "rzp_test_TFKzAVaT3QPhY7",
+        key: orderData.order.key_id,
         amount: orderData.order.amount,
         currency: orderData.order.currency,
         name: "MedBook Diagnostics",
@@ -185,11 +182,7 @@ export default function TestDetail() {
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                lab_id: labId,
-                test_id: testId,
-                slot_id: slot.slot_id,
-                appointment_date: selectedDate
+                razorpay_signature: response.razorpay_signature
               })
             })
 
