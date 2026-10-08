@@ -140,9 +140,10 @@ exports.getCompletedAppointments = async (req, res) => {
         l.name AS lab_name,
         t.test_name AS test_name
       FROM appointments a
-      JOIN labs l ON a.lab_id = l.lab_id
-      JOIN time_slots s ON a.slot_id=s.slot_id
-      JOIN tests t ON a.test_id = t.test_id
+      JOIN lab_test_slots lts ON a.lab_test_slot_id = lts.lab_test_slot_id
+      JOIN labs l ON lts.lab_id = l.lab_id
+      JOIN time_slots s ON lts.slot_id=s.slot_id
+      JOIN tests t ON lts.test_id = t.test_id
       WHERE a.patient_id = $1 AND a.status = 'COMPLETED'
       ORDER BY a.appointment_date DESC`,
       [patientId]
@@ -171,10 +172,11 @@ exports.getPastReviews = async (req, res) => {
         l.name AS lab_name,
         t.test_name AS test_name
       FROM reviews r
-      JOIN labs l ON r.lab_id = l.lab_id
       JOIN appointments a ON r.appointment_id = a.appointment_id
-      JOIN tests t ON a.test_id = t.test_id
-      WHERE r.patient_id = $1
+      JOIN lab_test_slots lts ON a.lab_test_slot_id = lts.lab_test_slot_id
+      JOIN labs l ON lts.lab_id = l.lab_id
+      JOIN tests t ON lts.test_id = t.test_id
+      WHERE a.patient_id = $1
       ORDER BY r.created_at DESC`,
       [patientId]
     );

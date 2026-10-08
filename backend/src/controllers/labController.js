@@ -27,8 +27,18 @@ exports.getDashboardStats = async (req, res) => {
     const [testsQuery, labQuery, completedQuery, upcomingQuery] = await Promise.all([
       db.query(`SELECT COUNT(*) FROM tests WHERE lab_id = $1`, [labId]),
       db.query(`SELECT average_rating, is_verified FROM labs WHERE lab_id = $1`, [labId]),
-      db.query(`SELECT COUNT(*) FROM appointments WHERE lab_id = $1 AND status = 'COMPLETED'`, [labId]),
-      db.query(`SELECT COUNT(*) FROM appointments WHERE lab_id = $1 AND status = 'CONFIRMED' AND appointment_date >= CURRENT_DATE`, [labId])
+      db.query(
+        `SELECT COUNT(*) FROM appointments a
+         JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+         WHERE lts.lab_id = $1 AND a.status = 'COMPLETED'`,
+        [labId]
+      ),
+      db.query(
+        `SELECT COUNT(*) FROM appointments a
+         JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+         WHERE lts.lab_id = $1 AND a.status = 'CONFIRMED' AND a.appointment_date >= CURRENT_DATE`,
+        [labId]
+      )
     ]);
 
     const stats = {
@@ -408,7 +418,10 @@ exports.updateSlot = async (req, res) => {
     }
 
     const futureAppointments = await db.query(
-      `SELECT COUNT(*) as count FROM appointments WHERE slot_id = $1 AND appointment_date >= CURRENT_DATE AND status = 'CONFIRMED'`,
+      `SELECT COUNT(*) as count
+       FROM appointments a
+       JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+       WHERE lts.slot_id = $1 AND a.appointment_date >= CURRENT_DATE AND a.status = 'CONFIRMED'`,
       [id]
     );
     const hasFutureBookings = parseInt(futureAppointments.rows[0].count) > 0;
@@ -425,10 +438,11 @@ exports.updateSlot = async (req, res) => {
     }
 
     const bookingCheck = await db.query(
-      `SELECT COUNT(*) as daily_count 
-       FROM appointments 
-       WHERE slot_id = $1 AND appointment_date >= CURRENT_DATE 
-       GROUP BY appointment_date 
+      `SELECT COUNT(*) as daily_count
+       FROM appointments a
+       JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+       WHERE lts.slot_id = $1 AND a.appointment_date >= CURRENT_DATE
+       GROUP BY a.appointment_date
        ORDER BY daily_count DESC LIMIT 1`,
       [id]
     );
@@ -487,10 +501,11 @@ exports.deleteSlot = async (req, res) => {
     }
 
     const futureAppointments = await db.query(
-      `SELECT COUNT(*) as count FROM appointments 
-       WHERE slot_id = $1 
-       AND appointment_date >= CURRENT_DATE 
-       AND status = 'CONFIRMED'`,
+      `SELECT COUNT(*) as count FROM appointments a
+       JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+       WHERE lts.slot_id = $1
+       AND a.appointment_date >= CURRENT_DATE
+       AND a.status = 'CONFIRMED'`,
       [id]
     );
 
@@ -553,10 +568,11 @@ exports.getLabAppointments = async (req, res) => {
         p.phone_number AS patient_phone, 
         p.email AS patient_email
       FROM appointments a
-      JOIN tests t ON a.test_id = t.test_id
+      JOIN lab_test_slots lts ON a.lab_test_slot_id = lts.lab_test_slot_id
+      JOIN tests t ON lts.test_id = t.test_id
       JOIN patients p ON a.patient_id = p.patient_id
-      JOIN time_slots s ON a.slot_id = s.slot_id
-      WHERE a.lab_id = $1
+      JOIN time_slots s ON lts.slot_id = s.slot_id
+      WHERE lts.lab_id = $1
     `;
 
     // 1. TODAY'S Appointments
@@ -618,8 +634,9 @@ exports.completeAppointment = async (req, res) => {
       `SELECT 
          status, 
          (appointment_date = CURRENT_DATE) AS is_today 
-       FROM appointments 
-       WHERE appointment_id = $1 AND lab_id = $2`,
+       FROM appointments a
+       JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+       WHERE a.appointment_id = $1 AND lts.lab_id = $2`,
       [id, loggedInLabId]
     );
 
@@ -1108,7 +1125,8 @@ exports.getRazorpayPayoutStatus = async (req, res) => {
          COUNT(p.payment_id) AS total_paid_transactions
        FROM appointments a
        JOIN payments p ON a.appointment_id = p.appointment_id
-       WHERE a.lab_id = $1 AND p.status = 'Success'`,
+       JOIN lab_test_slots lts ON a.lab_test_slot_id = lts.lab_test_slot_id
+       WHERE lts.lab_id = $1 AND p.status = 'Success'`,
       [labId]
     );
 

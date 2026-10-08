@@ -18,8 +18,9 @@ exports.submitReview = async (req, res) => {
 
     // 2. Fetch the appointment to verify ownership and status
     const appCheck = await db.query(
-      `SELECT lab_id, status FROM appointments 
-       WHERE appointment_id = $1 AND patient_id = $2`,
+      `SELECT lts.lab_id, a.status FROM appointments a
+       JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+       WHERE a.appointment_id = $1 AND a.patient_id = $2`,
       [appointmentId, patientId],
     );
 
@@ -40,10 +41,10 @@ exports.submitReview = async (req, res) => {
 
     // 4. Insert the Review
     const result = await db.query(
-      `INSERT INTO reviews (patient_id, lab_id, appointment_id, rating, comment)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO reviews (appointment_id, rating, comment)
+       VALUES ($1, $2, $3)
        RETURNING review_id, rating, comment, created_at`,
-      [patientId, labId, appointmentId, rating, comment || null],
+      [appointmentId, rating, comment || null],
     );
 
     // ==========================================
@@ -53,8 +54,10 @@ exports.submitReview = async (req, res) => {
       `UPDATE labs 
        SET average_rating = (
            SELECT ROUND(AVG(rating), 1) 
-           FROM reviews 
-           WHERE lab_id = $1
+           FROM reviews r
+           JOIN appointments a ON a.appointment_id = r.appointment_id
+           JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+           WHERE lts.lab_id = $1
        )
        WHERE lab_id = $1`,
       [labId]
@@ -95,8 +98,10 @@ exports.getLabReviews = async (req, res) => {
          r.created_at,
          p.name AS patient_name
        FROM reviews r
-       JOIN patients p ON r.patient_id = p.patient_id
-       WHERE r.lab_id = $1
+       JOIN appointments a ON a.appointment_id = r.appointment_id
+       JOIN patients p ON a.patient_id = p.patient_id
+       JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+       WHERE lts.lab_id = $1
        ORDER BY r.created_at DESC`,
       [labId],
     );
@@ -104,7 +109,10 @@ exports.getLabReviews = async (req, res) => {
     // Calculate Average Rating
     const avgQuery = await db.query(
       `SELECT ROUND(AVG(rating), 1) as average_rating 
-       FROM reviews WHERE lab_id = $1`,
+       FROM reviews r
+       JOIN appointments a ON a.appointment_id = r.appointment_id
+       JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+       WHERE lts.lab_id = $1`,
       [labId],
     );
 

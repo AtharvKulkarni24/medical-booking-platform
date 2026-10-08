@@ -211,7 +211,7 @@ exports.getLabTestDetails = async (req, res) => {
         `;
 
         let slotsQuery = "";
-        let queryParams = [lab_id];
+        let queryParams = [lab_id, test_id];
 
         // NEW LOGIC: Dynamic Slot Calculation based on our new Architecture
         if (date) {
@@ -226,12 +226,15 @@ exports.getLabTestDetails = async (req, res) => {
                     t.start_time,
                     t.end_time,
                     t.max_capacity,
-                    (SELECT COUNT(*) FROM appointments a 
-                     WHERE a.slot_id = t.slot_id 
-                       AND a.appointment_date = $2 
+                    (SELECT COUNT(*) FROM appointments a
+                     JOIN lab_test_slots booked ON booked.lab_test_slot_id = a.lab_test_slot_id
+                     WHERE booked.slot_id = t.slot_id
+                       AND a.appointment_date = $3
                        AND a.status = 'CONFIRMED') AS current_bookings
-                FROM time_slots t
-                WHERE t.lab_id = $1 AND t.day_of_week = $3
+                FROM lab_test_slots selected
+                JOIN time_slots t ON t.slot_id = selected.slot_id AND t.lab_id = selected.lab_id
+                WHERE selected.lab_id = $1 AND selected.test_id = $2
+                  AND t.day_of_week = $4
                 ORDER BY t.start_time ASC;
             `;
             queryParams.push(date, dayOfWeek);
@@ -239,14 +242,15 @@ exports.getLabTestDetails = async (req, res) => {
             // If no date is provided, just return the Master Weekly Templates
             slotsQuery = `
                 SELECT
-                    slot_id,
-                    day_of_week,
-                    start_time,
-                    end_time,
-                    max_capacity
-                FROM time_slots
-                WHERE lab_id = $1
-                ORDER BY day_of_week ASC, start_time ASC;
+                    t.slot_id,
+                    t.day_of_week,
+                    t.start_time,
+                    t.end_time,
+                    t.max_capacity
+                FROM lab_test_slots selected
+                JOIN time_slots t ON t.slot_id = selected.slot_id AND t.lab_id = selected.lab_id
+                WHERE selected.lab_id = $1 AND selected.test_id = $2
+                ORDER BY t.day_of_week ASC, t.start_time ASC;
             `;
         }
 

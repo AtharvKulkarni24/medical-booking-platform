@@ -36,15 +36,20 @@ exports.createAppointmentOrder = async (req, res) => {
 
     // UPDATED: Now we also fetch day_of_week to enforce strictly matching schedules
     const capacityCheck = await db.query(
-      `SELECT 
-         day_of_week,
-         start_time,
-         max_capacity,
-         (SELECT COUNT(*) FROM appointments 
-          WHERE slot_id = $1 AND appointment_date = $2 AND status = 'CONFIRMED') as current_booked
-       FROM time_slots 
-       WHERE slot_id = $1`,
-      [slot_id, appointment_date],
+      `SELECT
+         s.day_of_week,
+         s.start_time,
+         s.max_capacity,
+         (SELECT COUNT(*)
+          FROM appointments a
+          JOIN lab_test_slots booked ON booked.lab_test_slot_id = a.lab_test_slot_id
+          WHERE booked.slot_id = s.slot_id
+            AND a.appointment_date = $4
+            AND a.status = 'CONFIRMED') AS current_booked
+       FROM lab_test_slots selected
+       JOIN time_slots s ON s.slot_id = selected.slot_id AND s.lab_id = selected.lab_id
+       WHERE selected.lab_id = $1 AND selected.test_id = $2 AND selected.slot_id = $3`,
+      [lab_id, test_id, slot_id, appointment_date],
     );
 
     if (capacityCheck.rowCount === 0) {
@@ -83,8 +88,11 @@ exports.createAppointmentOrder = async (req, res) => {
     }
 
     const testCheck = await db.query(
-      `SELECT price FROM tests WHERE test_id = $1 AND lab_id = $2`,
-      [test_id, lab_id],
+      `SELECT t.price
+       FROM lab_test_slots lts
+       JOIN tests t ON t.test_id = lts.test_id AND t.lab_id = lts.lab_id
+       WHERE lts.test_id = $1 AND lts.lab_id = $2 AND lts.slot_id = $3`,
+      [test_id, lab_id, slot_id],
     );
 
     if (testCheck.rowCount === 0) {
@@ -180,23 +188,33 @@ exports.verifyAndBookAppointment = async (req, res) => {
     await client.query("BEGIN");
 
     // 2. Fetch the test price so we can log the exact amount paid in the payments table
-    const testQuery = await client.query(`SELECT price FROM tests WHERE test_id = $1`, [test_id]);
+    const testQuery = await client.query(
+      `SELECT t.price
+       FROM lab_test_slots lts
+       JOIN tests t ON t.test_id = lts.test_id AND t.lab_id = lts.lab_id
+       WHERE lts.lab_id = $1 AND lts.test_id = $2 AND lts.slot_id = $3`,
+      [lab_id, test_id, slot_id]
+    );
     if (testQuery.rowCount === 0) throw new Error("Test not found");
     const amountPaid = testQuery.rows[0].price;
 
     // 3. Save the Appointment (No payment_id here anymore!)
     const appointmentResult = await client.query(
-      `INSERT INTO appointments (patient_id, lab_id, test_id, slot_id, appointment_date, status)
-       SELECT $1, $2, $3, $4, $5, 'CONFIRMED'
+      `INSERT INTO appointments (patient_id, lab_test_slot_id, appointment_date, status)
+       SELECT $1, selected.lab_test_slot_id, $5, 'CONFIRMED'
+       FROM lab_test_slots selected
        WHERE (
           SELECT COUNT(*) 
-          FROM appointments 
-          WHERE slot_id = $4 AND appointment_date = $5 AND status = 'CONFIRMED'
+          FROM appointments a
+          JOIN lab_test_slots booked ON booked.lab_test_slot_id = a.lab_test_slot_id
+          WHERE booked.slot_id = selected.slot_id
+            AND a.appointment_date = $5 AND a.status = 'CONFIRMED'
        ) < (
           SELECT max_capacity 
-          FROM time_slots 
-          WHERE slot_id = $4
+          FROM time_slots s
+          WHERE s.slot_id = selected.slot_id AND s.lab_id = selected.lab_id
        )
+       AND selected.lab_id = $2 AND selected.test_id = $3 AND selected.slot_id = $4
        RETURNING appointment_id, status, created_at;`,
       [patientId, lab_id, test_id, slot_id, appointment_date]
     );
@@ -267,9 +285,10 @@ exports.getPatientAppointments = async (req, res) => {
          s.start_time, 
          s.end_time
        FROM appointments a
-       JOIN labs l ON a.lab_id = l.lab_id
-       JOIN tests t ON a.test_id = t.test_id
-       JOIN time_slots s ON a.slot_id = s.slot_id
+       JOIN lab_test_slots lts ON a.lab_test_slot_id = lts.lab_test_slot_id
+       JOIN labs l ON lts.lab_id = l.lab_id
+       JOIN tests t ON lts.test_id = t.test_id
+       JOIN time_slots s ON lts.slot_id = s.slot_id
        LEFT JOIN payments pay ON a.appointment_id = pay.appointment_id
        WHERE a.patient_id = $1
        ORDER BY a.appointment_date DESC, s.start_time DESC`,
@@ -434,11 +453,12 @@ exports.getLabDailyRoster = async (req, res) => {
          s.start_time,
          s.end_time
        FROM appointments a
+       JOIN lab_test_slots lts ON a.lab_test_slot_id = lts.lab_test_slot_id
        JOIN patients p ON a.patient_id = p.patient_id
-       JOIN tests t ON a.test_id = t.test_id
-       JOIN time_slots s ON a.slot_id = s.slot_id
+       JOIN tests t ON lts.test_id = t.test_id
+       JOIN time_slots s ON lts.slot_id = s.slot_id
        LEFT JOIN payments pay ON a.appointment_id = pay.appointment_id
-       WHERE a.lab_id = $1 AND a.appointment_date = $2
+       WHERE lts.lab_id = $1 AND a.appointment_date = $2
        ORDER BY s.start_time ASC`,
       [labId, targetDate],
     );
@@ -465,8 +485,10 @@ exports.completeAppointment = async (req, res) => {
 
     // 1. Verify the appointment belongs to this lab
     const appCheck = await db.query(
-      `SELECT status FROM appointments 
-       WHERE appointment_id = $1 AND lab_id = $2`,
+      `SELECT a.status
+       FROM appointments a
+       JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+       WHERE a.appointment_id = $1 AND lts.lab_id = $2`,
       [id, labId],
     );
 

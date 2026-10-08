@@ -27,8 +27,9 @@ async function processMidnightPayouts() {
         l.platform_commission_percentage
       FROM payments p
       JOIN appointments a ON p.appointment_id = a.appointment_id
-      JOIN labs l ON a.lab_id = l.lab_id
-      LEFT JOIN time_slots ts ON a.slot_id = ts.slot_id
+      JOIN lab_test_slots lts ON lts.lab_test_slot_id = a.lab_test_slot_id
+      JOIN labs l ON lts.lab_id = l.lab_id
+      LEFT JOIN time_slots ts ON lts.slot_id = ts.slot_id
       WHERE p.payout_status = 'PENDING'
         AND p.status = 'Success'
         AND (

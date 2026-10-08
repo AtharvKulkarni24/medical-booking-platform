@@ -19,6 +19,7 @@ dist-ssr
 *.env
 backend/.env
 frontend/.env
+/backup.sql
 
 # Wrangler / Cloudflare
 .wrangler/
